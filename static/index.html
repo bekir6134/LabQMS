@@ -279,6 +279,7 @@ td.strong{color:var(--text);font-weight:500}
 .tag-pill{background:var(--bg3);border:1px solid var(--border);border-radius:99px;padding:2px 8px;font-size:11px;color:var(--text2)}
 .tag-more{background:var(--primary);background:linear-gradient(135deg,var(--primary),var(--primary2));border:none;color:#fff}
 </style>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 <div id="app-loading" style="position:fixed;inset:0;z-index:9999;background:#0f172a;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
@@ -955,7 +956,7 @@ function renderDokumanListesi(){
   c.innerHTML=`<div class="page">
     <div class="section-header">
       <div class="section-title">Döküman Listesi</div>
-      ${canEdit('dokumanlar')?`<button class="btn btn-primary" onclick="openDocModal()">${icon('plus',14)} Döküman Ekle</button>`:`<button class="btn btn-ghost" disabled data-tip="Yetkiniz yok">${icon('plus',14)} Döküman Ekle</button>`}
+      ${canEdit('dokumanlar')?`<div style="display:flex;gap:8px"><button class="btn btn-ghost" onclick="openImportDocsExcel()">${icon('upload',14)} Excel ile İçe Aktar</button><button class="btn btn-primary" onclick="openDocModal()">${icon('plus',14)} Döküman Ekle</button></div>`:`<button class="btn btn-ghost" disabled>${icon('plus',14)} Döküman Ekle</button>`}
     </div>
     <div class="toolbar">
       <div class="tb-search"><svg class="s-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="doc-search" type="text" placeholder="Prosedür kodu veya adı ara..." oninput="renderDocTable()"></div>
@@ -1098,6 +1099,211 @@ function openDocModal(id=null){
     document.getElementById('d-durum').value='Aktif';
   }
   openModal('doc-modal');
+}
+
+
+// ==================== EXCEL IMPORT - DOKUMAN ====================
+function openImportDocsExcel(){
+  const ov=document.createElement('div');
+  ov.className='modal-overlay open';
+  ov.style.zIndex=3000;
+  ov.innerHTML=`
+    <div class="modal" style="max-width:520px">
+      <div class="modal-header">
+        <div class="modal-title">Excel ile Toplu Döküman İçe Aktar</div>
+        <div class="modal-close" onclick="this.closest('.modal-overlay').remove()">&#10005;</div>
+      </div>
+      <div class="modal-body" style="padding:20px">
+        <div style="background:rgba(0,212,170,.07);border:1px solid rgba(0,212,170,.2);border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px">
+          <b style="color:var(--accent)">Excel sütun sırası:</b><br>
+          A: Döküman Adı &nbsp; B: Döküman No &nbsp; C: Tarih &nbsp; D: Revizyon No &nbsp; E: Döküman Tipi<br>
+          <span style="color:var(--text3);font-size:12px">Tarih formatı: GG.AA.YYYY &nbsp;|&nbsp; 1. satır başlık olabilir, atlanır</span>
+        </div>
+        <label style="display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed var(--border);border-radius:10px;padding:32px;cursor:pointer;gap:8px" id="import-doc-drop">
+          <div style="color:var(--accent)">&#128196;</div>
+          <span style="font-size:14px;color:var(--text2)">Excel dosyası seç (.xlsx / .xls)</span>
+          <span style="font-size:12px;color:var(--text3)" id="import-doc-fname">veya buraya sürükle</span>
+          <input type="file" accept=".xlsx,.xls" style="display:none" id="import-doc-file" onchange="previewImportDocFile(this)">
+        </label>
+        <div id="import-doc-preview" style="margin-top:12px;font-size:13px;color:var(--text3)"></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;border-top:1px solid var(--border)">
+        <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">İptal</button>
+        <button class="btn btn-primary" id="import-doc-btn" onclick="doImportDocsExcel()" disabled>İçe Aktar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  document.getElementById('import-doc-drop').onclick = function(e){
+    if(e.target.tagName!=='INPUT') document.getElementById('import-doc-file').click();
+  };
+}
+
+function previewImportDocFile(input){
+  const file = input.files[0];
+  if(!file) return;
+  document.getElementById('import-doc-fname').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+    // Başlık satırını atla (A1 metinse)
+    const dataRows = rows.filter(function(r){ return r[1] && String(r[1]).trim(); });
+    const count = dataRows.length;
+    document.getElementById('import-doc-preview').innerHTML =
+      '<span style="color:var(--accent)">' + count + ' satır</span> bulundu - İçe Aktar butonuna bas';
+    document.getElementById('import-doc-btn').disabled = count===0;
+    // Veriyi geçici olarak sakla
+    window._importDocRows = dataRows;
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function doImportDocsExcel(){
+  const rows = window._importDocRows;
+  if(!rows||!rows.length){toast('Veri bulunamadı','error');return;}
+  const docs = DB.get('documents') || [];
+  const existing = {};
+  docs.forEach(function(d){ existing[d.kod]=true; });
+  let added=0, skipped=0;
+
+  rows.forEach(function(r){
+    const ad    = String(r[0]||'').trim();
+    const kod   = String(r[1]||'').trim();
+    const tarih = r[2] ? String(r[2]).trim() : '';
+    const revNo = parseInt(r[3])||0;
+    const tip   = String(r[4]||'Prosedür').trim();
+    if(!ad||!kod){return;}
+    if(existing[kod]){skipped++;return;}
+
+    // Tarih parse
+    let yayimTarihi = '';
+    if(tarih){
+      // Excel date objesi veya string
+      const t = tarih.split('.');
+      if(t.length===3){
+        const gun=t[0].padStart(2,'0');
+        const ay=t[1].padStart(2,'0');
+        const yil=t[2].length===2?'20'+t[2]:t[2];
+        yayimTarihi=yil+'-'+ay+'-'+gun;
+      } else if(tarih.includes('-')){
+        yayimTarihi = tarih;
+      }
+    }
+
+    docs.push({
+      id:'doc_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+      kod:kod, ad:ad, tip:tip,
+      yayimTarihi: revNo===0 ? yayimTarihi : '',
+      revTarihi:   revNo>0  ? yayimTarihi : '',
+      revNo:revNo, durum:'Aktif', notlar:'', files:[], kategori:''
+    });
+    existing[kod]=true;
+    added++;
+  });
+
+  DB.set('documents', docs);
+  document.querySelector('.modal-overlay[style*="3000"]').remove();
+  toast(added+' döküman eklendi'+(skipped?' ('+skipped+' atlandı)':''), 'success');
+  renderDokumanListesi();
+}
+
+// ==================== EXCEL IMPORT - DIS KAYNAK ====================
+function openImportDKExcel(){
+  const ov=document.createElement('div');
+  ov.className='modal-overlay open';
+  ov.style.zIndex=3000;
+  ov.innerHTML=`
+    <div class="modal" style="max-width:520px">
+      <div class="modal-header">
+        <div class="modal-title">Excel ile Toplu Dış Kaynak İçe Aktar</div>
+        <div class="modal-close" onclick="this.closest('.modal-overlay').remove()">&#10005;</div>
+      </div>
+      <div class="modal-body" style="padding:20px">
+        <div style="background:rgba(0,212,170,.07);border:1px solid rgba(0,212,170,.2);border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px">
+          <b style="color:var(--accent)">Excel sütun sırası:</b><br>
+          A: Standart No &nbsp; B: Standart Adı &nbsp; C: Yayın Tarihi<br>
+          <span style="color:var(--text3);font-size:12px">Tarih formatı: GG.AA.YYYY &nbsp;|&nbsp; 1. satır başlık olabilir, atlanır</span>
+        </div>
+        <label style="display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed var(--border);border-radius:10px;padding:32px;cursor:pointer;gap:8px" id="import-dk-drop">
+          <div style="color:var(--accent)">&#128196;</div>
+          <span style="font-size:14px;color:var(--text2)">Excel dosyası seç (.xlsx / .xls)</span>
+          <span style="font-size:12px;color:var(--text3)" id="import-dk-fname">veya buraya sürükle</span>
+          <input type="file" accept=".xlsx,.xls" style="display:none" id="import-dk-file" onchange="previewImportDKFile(this)">
+        </label>
+        <div id="import-dk-preview" style="margin-top:12px;font-size:13px;color:var(--text3)"></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;border-top:1px solid var(--border)">
+        <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">İptal</button>
+        <button class="btn btn-primary" id="import-dk-btn" onclick="doImportDKExcel()" disabled>İçe Aktar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  document.getElementById('import-dk-drop').onclick = function(e){
+    if(e.target.tagName!=='INPUT') document.getElementById('import-dk-file').click();
+  };
+}
+
+function previewImportDKFile(input){
+  const file = input.files[0];
+  if(!file) return;
+  document.getElementById('import-dk-fname').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const wb = XLSX.read(e.target.result, {type:'array'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+    const dataRows = rows.filter(function(r){ return r[0] && String(r[0]).trim(); });
+    const count = dataRows.length;
+    document.getElementById('import-dk-preview').innerHTML =
+      '<span style="color:var(--accent)">' + count + ' satır</span> bulundu';
+    document.getElementById('import-dk-btn').disabled = count===0;
+    window._importDKRows = dataRows;
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function doImportDKExcel(){
+  const rows = window._importDKRows;
+  if(!rows||!rows.length){toast('Veri bulunamadı','error');return;}
+  const list = DB.get('disKaynak') || [];
+  const existing = {};
+  list.forEach(function(d){ existing[d.standartNo]=true; });
+  let added=0, skipped=0;
+
+  rows.forEach(function(r){
+    const standartNo = String(r[0]||'').trim();
+    const standartAd = String(r[1]||'').trim();
+    const tarih      = r[2] ? String(r[2]).trim() : '';
+    if(!standartNo||!standartAd){return;}
+    if(existing[standartNo]){skipped++;return;}
+
+    let yayinTarihi = '';
+    if(tarih){
+      const t = tarih.split('.');
+      if(t.length===3){
+        const gun=t[0].padStart(2,'0');
+        const ay=t[1].padStart(2,'0');
+        const yil=t[2].length===2?'20'+t[2]:t[2];
+        yayinTarihi=yil+'-'+ay+'-'+gun;
+      } else if(tarih.includes('-')){
+        yayinTarihi=tarih;
+      }
+    }
+
+    list.push({
+      id:'dk_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+      standartNo:standartNo, standartAd:standartAd,
+      yayinTarihi:yayinTarihi, durum:'Aktif', notlar:'', files:[]
+    });
+    existing[standartNo]=true;
+    added++;
+  });
+
+  DB.set('disKaynak', list);
+  document.querySelector('.modal-overlay[style*="3000"]').remove();
+  toast(added+' standart eklendi'+(skipped?' ('+skipped+' atlandı)':''), 'success');
+  renderDisKaynakListesi();
 }
 
 function saveDoc(){
@@ -2619,7 +2825,7 @@ function renderDisKaynakListesi(){
   c.innerHTML=`<div class="page">
     <div class="section-header">
       <div class="section-title">Dış Kaynaklı Dökümanlar</div>
-      ${canEdit('disKaynak')?`<button class="btn btn-primary" onclick="openDKModal()">${icon('plus',14)} Döküman Ekle</button>`:`<button class="btn btn-ghost" disabled data-tip="Yetkiniz yok">${icon('plus',14)} Döküman Ekle</button>`}
+      ${canEdit('disKaynak')?`<div style="display:flex;gap:8px"><button class="btn btn-ghost" onclick="openImportDKExcel()">${icon('upload',14)} Excel ile İçe Aktar</button><button class="btn btn-primary" onclick="openDKModal()">${icon('plus',14)} Döküman Ekle</button></div>`:`<button class="btn btn-ghost" disabled>${icon('plus',14)} Döküman Ekle</button>`}
     </div>
     <div class="toolbar">
       <div class="tb-search"><svg class="s-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
