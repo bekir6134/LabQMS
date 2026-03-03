@@ -4,7 +4,7 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Any
-import os, json
+import os, json, time
 import psycopg2, psycopg2.extras, psycopg2.pool
 
 app = FastAPI(title="QMS17025 API")
@@ -16,7 +16,16 @@ _pool = None
 def get_pool():
     global _pool
     if _pool is None:
-        _pool = psycopg2.pool.SimpleConnectionPool(1, 10, DATABASE_URL)
+        # Railway DB bazen geç hazır oluyor, retry ekle
+        for attempt in range(5):
+            try:
+                _pool = psycopg2.pool.SimpleConnectionPool(1, 10, DATABASE_URL)
+                print(f"DB bağlantısı kuruldu (deneme {attempt+1})")
+                break
+            except Exception as e:
+                print(f"DB bağlantı hatası (deneme {attempt+1}): {e}")
+                if attempt < 4:
+                    time.sleep(2)
     return _pool
 
 def get_conn():
@@ -32,19 +41,23 @@ def init_db():
         cur.execute("""CREATE TABLE IF NOT EXISTS qms_store (
             key TEXT PRIMARY KEY, value JSONB NOT NULL);""")
         conn.commit()
+        print("DB tablosu hazır")
     finally:
         put_conn(conn)
 
 @app.on_event("startup")
 def startup():
-    init_db()
-
-class StoreItem(BaseModel):
-    value: Any
+    try:
+        init_db()
+    except Exception as e:
+        print(f"Startup DB hatası: {e}")
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+class StoreItem(BaseModel):
+    value: Any
 
 @app.get("/api/store")
 def get_all():
