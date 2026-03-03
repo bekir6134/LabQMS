@@ -360,6 +360,8 @@ const DB = {
   _loaded: false,
 
   // Tüm veriyi API'den yükle (uygulama açılışında bir kez)
+  _defQueue: [],
+
   async loadAll() {
     let retries = 3;
     while(retries > 0) {
@@ -376,8 +378,7 @@ const DB = {
         if(retries > 0) await new Promise(r => setTimeout(r, 1500));
       }
     }
-    // Tüm denemeler başarısız - localStorage fallback
-    console.warn('API erişilemiyor, localStorage kullanılıyor');
+    console.warn('API erişilemiyor, localStorage fallback');
     for(const key of Object.keys(localStorage)) {
       if(key.startsWith('qms_')) {
         const k = key.replace('qms_','');
@@ -385,6 +386,26 @@ const DB = {
       }
     }
     this._loaded = true;
+  },
+
+  // Varsayılan verileri API'ye toplu olarak yaz (ilk kurulum)
+  async flushDefaults() {
+    if(this._defQueue.length === 0) return;
+    const batch = {};
+    for(const [k, v] of this._defQueue) {
+      batch[k] = v;
+    }
+    this._defQueue = [];
+    try {
+      await fetch('/api/store', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(batch)
+      });
+      console.log('Varsayılan veriler DB'ye yazıldı:', Object.keys(batch).join(', '));
+    } catch(e) {
+      console.warn('Varsayılan veriler yazılamadı:', e);
+    }
   },
 
   get(k) {
@@ -407,15 +428,8 @@ const DB = {
   def(k, v) {
     if(this.get(k) === null) {
       this._cache[k] = v;
-      // Sadece API'ye kaydet, mevcut değeri ezme
-      fetch('/api/store/' + k, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({value: v})
-      }).catch(() => {
-        if(!localStorage.getItem('qms_' + k))
-          localStorage.setItem('qms_' + k, JSON.stringify(v));
-      });
+      // flushDefaults() çağrılana kadar queue'da beklet
+      this._defQueue.push([k, v]);
     }
   }
 };
@@ -2886,6 +2900,11 @@ async function init(){
   const msg = document.getElementById('app-loading-msg');
   if(msg) msg.textContent = 'Veritabanına bağlanıyor...';
   await DB.loadAll();
+  if(msg) msg.textContent = 'Varsayılan veriler yükleniyor...';
+
+  // DB boşsa varsayılan verileri yaz (ilk kurulum)
+  // DB.def() çağrıları buraya kadar queue'da bekledi
+  await DB.flushDefaults();
   if(msg) msg.textContent = 'Uygulama hazırlanıyor...';
 
   if(loading) loading.style.display='none';
