@@ -286,6 +286,40 @@ td.strong{color:var(--text);font-weight:500}
   <p id="app-loading-msg" style="color:#94a3b8;font-size:14px">Sunucuya bağlanıyor...</p>
 </div>
 
+<!-- LOGIN EKRANI -->
+<div id="login-screen" style="display:none;position:fixed;inset:0;z-index:8000;background:#0f172a;align-items:center;justify-content:center">
+  <div style="width:100%;max-width:400px;padding:24px">
+    <div style="text-align:center;margin-bottom:32px">
+      <div style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#00d4aa,#7b9ff5);display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </div>
+      <div style="font-size:20px;font-weight:700;color:#f1f5f9" id="login-firm-name">KYS</div>
+      <div style="font-size:12px;color:#64748b;margin-top:4px">Kalite Yönetim Sistemi</div>
+    </div>
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:16px;padding:28px">
+      <div style="margin-bottom:16px">
+        <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;font-weight:500">Kullanıcı Adı</label>
+        <input id="login-username" type="text" placeholder="kullanici_adi"
+          style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 12px;color:#f1f5f9;font-size:14px;outline:none;box-sizing:border-box"
+          onkeydown="if(event.key==='Enter')document.getElementById('login-password').focus()">
+      </div>
+      <div style="margin-bottom:20px">
+        <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;font-weight:500">Şifre</label>
+        <input id="login-password" type="password" placeholder="••••••••"
+          style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 12px;color:#f1f5f9;font-size:14px;outline:none;box-sizing:border-box"
+          onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <div id="login-error" style="display:none;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:8px;padding:10px 12px;font-size:13px;color:#f87171;margin-bottom:16px;text-align:center">
+        Kullanıcı adı veya şifre hatalı
+      </div>
+      <button onclick="doLogin()" style="width:100%;background:linear-gradient(135deg,#00d4aa,#00b894);border:none;border-radius:8px;padding:12px;color:#fff;font-size:14px;font-weight:600;cursor:pointer">
+        Giriş Yap
+      </button>
+    </div>
+    <div style="text-align:center;margin-top:16px;font-size:11px;color:#334155">ISO/IEC 17025:2017</div>
+  </div>
+</div>
+
 <!-- SIDEBAR -->
 <div id="sidebar">
   <div class="sidebar-header">
@@ -299,7 +333,7 @@ td.strong{color:var(--text);font-weight:500}
   </div>
   <nav class="sidebar-nav" id="nav-menu"></nav>
   <div class="sidebar-footer">
-    <div class="user-pill" onclick="openUserSelect()">
+    <div class="user-pill" id="user-pill-btn" onclick="openUserSelect()">
       <div class="user-avatar" id="nav-avatar">Y</div>
       <div class="user-info">
         <div class="user-name" id="nav-username">Yönetici</div>
@@ -307,6 +341,9 @@ td.strong{color:var(--text);font-weight:500}
       </div>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text3)"><polyline points="6 9 12 15 18 9"/></svg>
     </div>
+    <button onclick="doLogout()" title="Çıkış Yap" style="background:none;border:none;cursor:pointer;padding:6px;border-radius:6px;color:var(--text3);display:flex;align-items:center" onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='var(--text3)'">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    </button>
   </div>
 </div>
 
@@ -2898,6 +2935,70 @@ function toggleSidebar(){
   document.getElementById('sidebar').classList.toggle('open');
 }
 
+// ==================== LOGIN ====================
+function showLogin(){
+  const ls = document.getElementById('login-screen');
+  ls.style.display = 'flex';
+  // Firma adını güncelle
+  const s = DB.get('settings');
+  if(s && s.firmName){
+    const el = document.getElementById('login-firm-name');
+    if(el) el.textContent = s.firmName;
+  }
+  setTimeout(()=>{ document.getElementById('login-username').focus(); }, 100);
+}
+
+function hideLogin(){
+  const ls = document.getElementById('login-screen');
+  ls.style.display = 'none';
+}
+
+function doLogin(){
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+
+  if(!username || !password){
+    errEl.textContent = 'Kullanıcı adı ve şifre gerekli';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const personeller = DB.get('personeller') || [];
+  const user = personeller.find(p =>
+    p.username === username && p.password === password && p.active !== false
+  );
+
+  if(!user){
+    errEl.textContent = 'Kullanıcı adı veya şifre hatalı';
+    errEl.style.display = 'block';
+    document.getElementById('login-password').value = '';
+    document.getElementById('login-password').focus();
+    return;
+  }
+
+  // Başarılı giriş
+  DB.set('aktifUser', user.id);
+  sessionStorage.setItem('qms_session', user.id);
+  hideLogin();
+  updateUserDisplay();
+  buildNav();
+  navigate('dashboard');
+
+  // Yönetici değilse user-pill tıklanamaz
+  const pill = document.getElementById('user-pill-btn');
+  if(pill) pill.onclick = user.rol === 'Yonetici' ? openUserSelect : null;
+}
+
+function doLogout(){
+  sessionStorage.removeItem('qms_session');
+  DB.set('aktifUser', null);
+  document.getElementById('login-username').value = '';
+  document.getElementById('login-password').value = '';
+  showLogin();
+}
+
 async function init(){
   // Önce API'den tüm veriyi yükle, sonra uygulamayı başlat
   const loading = document.getElementById('app-loading');
@@ -2908,17 +3009,33 @@ async function init(){
   await DB.loadAll();
   if(msg) msg.textContent = 'Varsayılan veriler yükleniyor...';
 
-  // DB boşsa varsayılan verileri yaz (ilk kurulum)
-  // DB.def() çağrıları buraya kadar queue'da bekledi
   await DB.flushDefaults();
   if(msg) msg.textContent = 'Uygulama hazırlanıyor...';
 
   if(loading) loading.style.display='none';
 
   applySettings();
-  updateUserDisplay();
-  buildNav();
-  navigate('dashboard');
+
+  // Session kontrolü - daha önce giriş yapıldı mı?
+  const sessionUserId = sessionStorage.getItem('qms_session');
+  const personeller = DB.get('personeller') || [];
+  const sessionUser = sessionUserId ? personeller.find(p => p.id === sessionUserId) : null;
+
+  if(sessionUser){
+    // Oturum var, direkt gir
+    DB.set('aktifUser', sessionUser.id);
+    updateUserDisplay();
+    buildNav();
+    navigate('dashboard');
+    // Yönetici değilse user-pill tıklanamaz
+    const pill = document.getElementById('user-pill-btn');
+    if(pill) pill.onclick = sessionUser.rol === 'Yonetici' ? openUserSelect : null;
+  } else {
+    // Oturum yok, login göster
+    updateUserDisplay();
+    buildNav();
+    showLogin();
+  }
 
   // Mobile check
   if(window.innerWidth<=768){
