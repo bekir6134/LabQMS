@@ -402,7 +402,7 @@ const DB = {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(batch)
       });
-      console.log('Varsayılan veriler DB'ye yazıldı:', Object.keys(batch).join(', '));
+      console.log('Varsayilan veriler DB yazildi:', Object.keys(batch).join(', '));
     } catch(e) {
       console.warn('Varsayılan veriler yazılamadı:', e);
     }
