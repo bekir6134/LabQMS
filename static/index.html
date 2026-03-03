@@ -955,7 +955,12 @@ function renderDokumanListesi(){
   c.innerHTML=`<div class="page">
     <div class="section-header">
       <div class="section-title">Döküman Listesi</div>
-      ${canEdit('dokumanlar')?`<button class="btn btn-primary" onclick="openDocModal()">${icon('plus',14)} Döküman Ekle</button>`:`<button class="btn btn-ghost" disabled data-tip="Yetkiniz yok">${icon('plus',14)} Döküman Ekle</button>`}
+      <div style="display:flex;gap:8px">
+      ${canEdit('dokumanlar')?`
+        <button class="btn btn-ghost" onclick="openImportDocsModal()">${icon('upload',14)} Toplu İçe Aktar</button>
+        <button class="btn btn-primary" onclick="openDocModal()">${icon('plus',14)} Döküman Ekle</button>
+      `:`<button class="btn btn-ghost" disabled>${icon('plus',14)} Döküman Ekle</button>`}
+      </div>
     </div>
     <div class="toolbar">
       <div class="tb-search"><svg class="s-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="doc-search" type="text" placeholder="Prosedür kodu veya adı ara..." oninput="renderDocTable()"></div>
@@ -1098,6 +1103,92 @@ function openDocModal(id=null){
     document.getElementById('d-durum').value='Aktif';
   }
   openModal('doc-modal');
+}
+
+
+// ==================== TOPLU DOKUMAN IMPORT ====================
+function openImportDocsModal(){
+  const ov=document.createElement('div');
+  ov.className='modal-overlay open';
+  ov.id='import-docs-overlay';
+  ov.style.zIndex=3000;
+  ov.innerHTML=`
+    <div class="modal modal-lg" style="max-width:680px">
+      <div class="modal-header">
+        <div class="modal-title">Toplu Dokuman Ice Aktar</div>
+        <div class="modal-close" onclick="this.closest('.modal-overlay').remove()">X</div>
+      </div>
+      <div class="modal-body">
+        <div style="background:rgba(0,212,170,.07);border:1px solid rgba(0,212,170,.2);border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:13px;color:var(--text2)">
+          <b style="color:var(--accent)">Sutun sirasi:</b><br>
+          Dokuman Adi | Dokuman No | Tarih (GG.AA.YYYY) | Revizyon No | Dokuman Tipi<br>
+          <span style="color:var(--text3);font-size:12px">Ayirici: Tab, noktali virgul veya virgul olabilir.</span>
+        </div>
+        <textarea id="import-docs-text" placeholder="Multimetre Kalibrasyon Proseduru	AKPE101	10.12.2022	4	Prosedur"
+          style="width:100%;height:220px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text);font-size:12px;font-family:monospace;resize:vertical;box-sizing:border-box"></textarea>
+        <div id="import-docs-preview" style="margin-top:12px;font-size:12px;color:var(--text3)"></div>
+      </div>
+      <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:16px 20px;border-top:1px solid var(--border)">
+        <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">Iptal</button>
+        <button class="btn btn-primary" onclick="doImportDocs()">Ice Aktar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  document.getElementById('import-docs-text').addEventListener('input', function(){
+    const text = this.value.trim();
+    const prev = document.getElementById('import-docs-preview');
+    if(!text){prev.textContent='';return;}
+    const lines = text.split('\n').filter(function(l){return l.trim();});
+    prev.innerHTML = '<span style="color:var(--accent)">'+lines.length+' dokuman</span> hazir';
+  });
+}
+
+function doImportDocs(){
+  const text = document.getElementById('import-docs-text').value.trim();
+  if(!text){toast('Veri girilmedi','error');return;}
+  const lines = text.split('\n').filter(function(l){return l.trim();});
+  const docs = DB.get('documents') || [];
+  const existing = {};
+  docs.forEach(function(d){existing[d.kod]=true;});
+  let added = 0, skipped = 0;
+  for(let i=0;i<lines.length;i++){
+    const line = lines[i].trim();
+    if(!line) continue;
+    let parts;
+    if(line.indexOf('\t')>=0) parts=line.split('\t');
+    else if(line.indexOf(';')>=0) parts=line.split(';');
+    else parts=line.split(',');
+    parts = parts.map(function(p){return p.trim();});
+    const ad    = parts[0]||'';
+    const kod   = parts[1]||'';
+    const tarih = parts[2]||'';
+    const revNo = parseInt(parts[3])||0;
+    const tip   = parts[4]||'Prosedur';
+    if(!kod||!ad){continue;}
+    if(existing[kod]){skipped++;continue;}
+    let yayimTarihi='';
+    if(tarih){
+      const t=tarih.split('.');
+      if(t.length===3){
+        const gun=t[0].padStart(2,'0');
+        const ay=t[1].padStart(2,'0');
+        const yil=t[2].length===2?'20'+t[2]:t[2];
+        yayimTarihi=yil+'-'+ay+'-'+gun;
+      }
+    }
+    docs.push({
+      id:'doc_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+      kod:kod,ad:ad,tip:tip,
+      yayimTarihi:(revNo===0?yayimTarihi:""),revTarihi:(revNo>0?yayimTarihi:""),
+      revNo:revNo,durum:'Aktif',notlar:'',files:[],kategori:''
+    });
+    existing[kod]=true;
+    added++;
+  }
+  DB.set('documents', docs);
+  document.getElementById('import-docs-overlay').remove();
+  toast(added+' dokuman eklendi'+(skipped?' ('+skipped+' atlandı)':''), 'success');
+  renderDokumanListesi();
 }
 
 function saveDoc(){
