@@ -16,14 +16,17 @@ _pool = None
 def get_pool():
     global _pool
     if _pool is None:
-        # Railway DB bazen geç hazır oluyor, retry ekle
         for attempt in range(5):
             try:
-                _pool = psycopg2.pool.SimpleConnectionPool(1, 10, DATABASE_URL)
-                print(f"DB bağlantısı kuruldu (deneme {attempt+1})")
+                # Neon SSL gerektirir
+                _pool = psycopg2.pool.SimpleConnectionPool(
+                    1, 10, DATABASE_URL,
+                    sslmode='require'
+                )
+                print(f"DB baglantisi kuruldu (deneme {attempt+1})")
                 break
             except Exception as e:
-                print(f"DB bağlantı hatası (deneme {attempt+1}): {e}")
+                print(f"DB baglanti hatasi (deneme {attempt+1}): {e}")
                 if attempt < 4:
                     time.sleep(2)
     return _pool
@@ -41,7 +44,7 @@ def init_db():
         cur.execute("""CREATE TABLE IF NOT EXISTS qms_store (
             key TEXT PRIMARY KEY, value JSONB NOT NULL);""")
         conn.commit()
-        print("DB tablosu hazır")
+        print("DB tablosu hazir")
     finally:
         put_conn(conn)
 
@@ -50,7 +53,7 @@ def startup():
     try:
         init_db()
     except Exception as e:
-        print(f"Startup DB hatası: {e}")
+        print(f"Startup DB hatasi: {e}")
 
 @app.get("/health")
 def health():
