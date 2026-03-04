@@ -152,13 +152,12 @@ def check_and_send_notifications():
             </div>
         </div>"""
 
-        params = resend.Emails.SendParams(
-            from_="LabQMS <onboarding@resend.dev>",
-            to=emails,
-            subject=f"[{firm_name}] LabQMS — {len(alerts)} Bildirim ({datetime.date.today().strftime('%d.%m.%Y')})",
-            html=html
-        )
-        result = resend.Emails.send(params)
+        result = resend.Emails.send({
+            "from": "LabQMS <onboarding@resend.dev>",
+            "to": emails,
+            "subject": "[{}] LabQMS — {} Bildirim ({})".format(firm_name, len(alerts), datetime.date.today().strftime('%d.%m.%Y')),
+            "html": html
+        })
         print(f"Mail gonderildi: {result}")
 
     except Exception as e:
