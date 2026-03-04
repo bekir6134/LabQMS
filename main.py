@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Any
 import os, json, time, datetime
-import psycopg2, psycopg2.extras, psycopg2.pool
+import psycopg2, psycopg2.extras
 import resend
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -16,27 +16,17 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "")
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 resend.api_key = RESEND_API_KEY
 
-_pool = None
-
-def get_pool():
-    global _pool
-    if _pool is None:
-        for attempt in range(5):
-            try:
-                _pool = psycopg2.pool.SimpleConnectionPool(1, 10, DATABASE_URL, sslmode='require')
-                print(f"DB baglantisi kuruldu (deneme {attempt+1})")
-                break
-            except Exception as e:
-                print(f"DB baglanti hatasi (deneme {attempt+1}): {e}")
-                if attempt < 4:
-                    time.sleep(2)
-    return _pool
-
 def get_conn():
-    return get_pool().getconn()
-
-def put_conn(conn):
-    get_pool().putconn(conn)
+    """Her istekte yeni bağlantı aç - Neon SSL kopma sorununu önler"""
+    for attempt in range(3):
+        try:
+            conn = psycopg2.connect(DATABASE_URL, sslmode='require', connect_timeout=10)
+            return conn
+        except Exception as e:
+            print(f"DB baglanti hatasi (deneme {attempt+1}): {e}")
+            if attempt < 2:
+                time.sleep(1)
+    raise Exception("DB baglantisi kurulamadi")
 
 def init_db():
     conn = get_conn()
@@ -47,7 +37,7 @@ def init_db():
         conn.commit()
         print("DB tablosu hazir")
     finally:
-        put_conn(conn)
+        conn.close()
 
 def db_get(key):
     conn = get_conn()
@@ -57,10 +47,9 @@ def db_get(key):
         row = cur.fetchone()
         return row["value"] if row else None
     finally:
-        put_conn(conn)
+        conn.close()
 
 # ==================== BİLDİRİM ====================
-
 def days_until(date_str):
     if not date_str:
         return None
@@ -98,7 +87,6 @@ def check_and_send_notifications():
 
         alerts = []
 
-        # Referans Cihazlar
         if notif_types.get("referans", True):
             for x in (db_get("referans") or []):
                 d = days_until(x.get("birSonrakiKalibrasyon"))
@@ -108,7 +96,6 @@ def check_and_send_notifications():
                     elif d <= threshold:
                         alerts.append({"tip":"🟡 YAKLAŞAN","modul":"Referans Cihaz","ad":x.get("cihazAdi","-"),"tarih":fmt_date(x.get("birSonrakiKalibrasyon")),"gun":f"{d} gün kaldı","renk":"#d97706"})
 
-        # Ara Kontrol
         if notif_types.get("araKontrol", True):
             for x in (db_get("araKontrol") or []):
                 d = days_until(x.get("birSonrakiPlanliAra"))
@@ -118,14 +105,12 @@ def check_and_send_notifications():
                     elif d <= threshold:
                         alerts.append({"tip":"🟡 YAKLAŞAN","modul":"Ara Kontrol","ad":x.get("cihazAdi","-"),"tarih":fmt_date(x.get("birSonrakiPlanliAra")),"gun":f"{d} gün kaldı","renk":"#d97706"})
 
-        # LAK
         if notif_types.get("lak", True):
             for x in (db_get("lak") or []):
                 d = days_until(x.get("birSonrakiPlanliLak"))
                 if d is not None and d <= threshold:
                     alerts.append({"tip":"🟡 YAKLAŞAN","modul":"LAK/YT","ad":x.get("lakAdi","-"),"tarih":fmt_date(x.get("birSonrakiPlanliLak")),"gun":f"{d} gün kaldı","renk":"#d97706"})
 
-        # PAK
         if notif_types.get("pak", True):
             for x in (db_get("pak") or []):
                 d = days_until(x.get("birSonrakiPlanliPak"))
@@ -136,32 +121,28 @@ def check_and_send_notifications():
             print("Bildirim gonderilecek kayit yok")
             return
 
-        rows = "".join([f"""
-            <tr>
-                <td style="padding:10px 12px;border-bottom:1px solid #1e293b">{a['tip']}</td>
-                <td style="padding:10px 12px;border-bottom:1px solid #1e293b">{a['modul']}</td>
-                <td style="padding:10px 12px;border-bottom:1px solid #1e293b;font-weight:600">{a['ad']}</td>
-                <td style="padding:10px 12px;border-bottom:1px solid #1e293b">{a['tarih']}</td>
-                <td style="padding:10px 12px;border-bottom:1px solid #1e293b;color:{a['renk']};font-weight:600">{a['gun']}</td>
-            </tr>""" for a in alerts])
+        rows = "".join([f"""<tr>
+            <td style="padding:10px 12px;border-bottom:1px solid #1e293b">{a['tip']}</td>
+            <td style="padding:10px 12px;border-bottom:1px solid #1e293b">{a['modul']}</td>
+            <td style="padding:10px 12px;border-bottom:1px solid #1e293b;font-weight:600">{a['ad']}</td>
+            <td style="padding:10px 12px;border-bottom:1px solid #1e293b">{a['tarih']}</td>
+            <td style="padding:10px 12px;border-bottom:1px solid #1e293b;color:{a['renk']};font-weight:600">{a['gun']}</td>
+        </tr>""" for a in alerts])
 
-        html = f"""
-        <div style="font-family:Arial,sans-serif;background:#0f172a;color:#e2e8f0;padding:32px;border-radius:12px;max-width:700px;margin:0 auto">
+        html = f"""<div style="font-family:Arial,sans-serif;background:#0f172a;color:#e2e8f0;padding:32px;border-radius:12px;max-width:700px;margin:0 auto">
             <div style="text-align:center;margin-bottom:28px">
                 <div style="font-size:28px;font-weight:800;color:#00d4aa">{firm_name}</div>
                 <div style="font-size:13px;color:#64748b;margin-top:4px">LabQMS Bildirim Raporu — {datetime.date.today().strftime('%d.%m.%Y')}</div>
             </div>
             <div style="background:#1e293b;border-radius:10px;overflow:hidden;margin-bottom:24px">
                 <table style="width:100%;border-collapse:collapse;font-size:13px">
-                    <thead>
-                        <tr style="background:#0f172a">
-                            <th style="padding:12px;text-align:left;color:#64748b">Durum</th>
-                            <th style="padding:12px;text-align:left;color:#64748b">Modül</th>
-                            <th style="padding:12px;text-align:left;color:#64748b">Ad</th>
-                            <th style="padding:12px;text-align:left;color:#64748b">Tarih</th>
-                            <th style="padding:12px;text-align:left;color:#64748b">Kalan</th>
-                        </tr>
-                    </thead>
+                    <thead><tr style="background:#0f172a">
+                        <th style="padding:12px;text-align:left;color:#64748b">Durum</th>
+                        <th style="padding:12px;text-align:left;color:#64748b">Modül</th>
+                        <th style="padding:12px;text-align:left;color:#64748b">Ad</th>
+                        <th style="padding:12px;text-align:left;color:#64748b">Tarih</th>
+                        <th style="padding:12px;text-align:left;color:#64748b">Kalan</th>
+                    </tr></thead>
                     <tbody>{rows}</tbody>
                 </table>
             </div>
@@ -228,7 +209,7 @@ def get_all():
         cur.execute("SELECT key, value FROM qms_store")
         return {row["key"]: row["value"] for row in cur.fetchall()}
     finally:
-        put_conn(conn)
+        conn.close()
 
 @app.post("/api/store")
 def set_all(data: dict):
@@ -242,7 +223,7 @@ def set_all(data: dict):
         conn.commit()
         return {"ok": True, "count": len(data)}
     finally:
-        put_conn(conn)
+        conn.close()
 
 @app.get("/api/store/{key}")
 def get_value(key: str):
@@ -253,7 +234,7 @@ def get_value(key: str):
         row = cur.fetchone()
         return {"key": key, "value": row["value"] if row else None}
     finally:
-        put_conn(conn)
+        conn.close()
 
 @app.post("/api/store/{key}")
 def set_value(key: str, item: StoreItem):
@@ -266,7 +247,7 @@ def set_value(key: str, item: StoreItem):
         conn.commit()
         return {"ok": True, "key": key}
     finally:
-        put_conn(conn)
+        conn.close()
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
