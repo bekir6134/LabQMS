@@ -6,3 +6,4 @@ EN SKORU DEĞER AZALDIKÇA YEŞİL RENK OLSUN
 Lak listesine katımlıcı sayısı,lab kodu,ölçüm aralığı ekleyelim ayrıca flitre kısmına lak süresi yaklaşanları flitre yapabilelim
 dashborada 6 cihazın üstünde göstermiyor sığmıyor sanırım
 Lak cihaz listesi kısmına pdf veya excel birden fazla yüklenebilir olsun.
+kart görünüm şeklinde olabilir listeleme
