@@ -8,3 +8,5 @@ dashborada 6 cihazın üstünde göstermiyor sığmıyor sanırım
 Lak cihaz listesi kısmına pdf veya excel birden fazla yüklenebilir olsun.
 kart görünüm şeklinde olabilir listeleme
 LAK KISMI KATEGORİLER BÜYÜK HARF YAZILSIN.
+yapılan faaliyet girafiğini kaldıralım oraya bir haftalık iş planlama yapalım yapılacak iler tarzında
+gün özeti kısmı kaldıralım
