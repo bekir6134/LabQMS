@@ -7,3 +7,4 @@ Lak listesine katımlıcı sayısı,lab kodu,ölçüm aralığı ekleyelim ayrı
 dashborada 6 cihazın üstünde göstermiyor sığmıyor sanırım
 Lak cihaz listesi kısmına pdf veya excel birden fazla yüklenebilir olsun.
 kart görünüm şeklinde olabilir listeleme
+LAK KISMI KATEGORİLER BÜYÜK HARF YAZILSIN.
