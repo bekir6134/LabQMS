@@ -2770,7 +2770,7 @@ function renderPersonelTable(){
       </div>`).join('');
 
     // Belgeler özeti
-    const belgeOzet=PERSONEL_BELGE_KATEGORILER().map(k=>{
+    const belgeOzet=PERSONEL_BELGE_KATEGORILER.map(k=>{
       const count=(belgeler[k.id]||[]).length;
       return count>0?`<span onclick="showPersonelBelgeList('${p.id}','${k.id}')" style="font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(0,212,170,.1);color:var(--accent);cursor:pointer" onmouseover="this.style.background='rgba(0,212,170,.2)'" onmouseout="this.style.background='rgba(0,212,170,.1)'">${k.label}: ${count}</span>`:'';
     }).filter(Boolean).join('');
@@ -2966,7 +2966,7 @@ function renderPersonelBelgeler(){
   const p = persons.find(x => x.id === _editPersonelId);
   const belgeler = (p && p.belgeler) ? p.belgeler : {};
 
-  container.innerHTML = PERSONEL_BELGE_KATEGORILER().map(kat => {
+  container.innerHTML = PERSONEL_BELGE_KATEGORILER.map(kat => {
     const files = belgeler[kat.id] || [];
     return `
       <div style="margin-bottom:16px;border:1px solid var(--border);border-radius:10px;overflow:hidden">
