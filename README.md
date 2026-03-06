@@ -1,3 +1,4 @@
+şimdi ilk aşamada satın alma ihtiyacında ürün hizmet referans cihazlardan cihaz adı,marka,model,serino,envanterno kısmında seçilebilir olsun birden fazla ekleyebilelim son aşamada referans değerlendirmede aynı bilgileri oraya otomatik gelsin ayrıca tedarikçi değerlendirmeden sonra kart üzerindeki buton referans değerlendir butonu olsun bunu arama çubuğunda cihaz adı veya envanter ile arama yapabilelim
 
 Dköümanları kontrol formu ekle
 otomatik yedeklemeyi ekle(1 hafta)
