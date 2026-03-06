@@ -503,13 +503,14 @@ DB.def('tedarikci',[]);
 DB.def('satinAlmaTalep',[]);
 DB.def('tedDegerlendirme',[]);
 DB.def('refCihazDeg',[]);
+DB.def('kategoriler',['Boyut','Basınç','Kuvvet','Tork','Sıcaklık','Elektrik','Frekans','Yüksek Gerilim','Lüks','Diğer']);
 
 // ==================== RBAC ====================
 const MODULES = ['dokumanlar','disKaynak','lak','pak','araKontrol','referans','satinalma','uygunsuzluklar','personeller','ayarlar'];
 const DEFAULT_PERMS = {
-  Yonetici:{dokumanlar:{v:1,e:1},disKaynak:{v:1,e:1},lak:{v:1,e:1},pak:{v:1,e:1},araKontrol:{v:1,e:1},referans:{v:1,e:1},uygunsuzluklar:{v:1,e:1},personeller:{v:1,e:1},ayarlar:{v:1,e:1}},
-  Duzenleyebilir:{dokumanlar:{v:1,e:1},disKaynak:{v:1,e:1},lak:{v:1,e:1},pak:{v:1,e:1},araKontrol:{v:1,e:1},referans:{v:1,e:1},uygunsuzluklar:{v:1,e:1},personeller:{v:1,e:0},ayarlar:{v:1,e:0}},
-  Goruntuleyebilir:{dokumanlar:{v:1,e:0},disKaynak:{v:1,e:0},lak:{v:1,e:0},pak:{v:1,e:0},araKontrol:{v:1,e:0},referans:{v:1,e:0},uygunsuzluklar:{v:1,e:0},personeller:{v:1,e:0},ayarlar:{v:0,e:0}}
+  Yonetici:{dokumanlar:{v:1,e:1},disKaynak:{v:1,e:1},lak:{v:1,e:1},pak:{v:1,e:1},araKontrol:{v:1,e:1},referans:{v:1,e:1},uygunsuzluklar:{v:1,e:1},personeller:{v:1,e:1},satinalma:{v:1,e:1},ayarlar:{v:1,e:1}},
+  Duzenleyebilir:{dokumanlar:{v:1,e:1},disKaynak:{v:1,e:1},lak:{v:1,e:1},pak:{v:1,e:1},araKontrol:{v:1,e:1},referans:{v:1,e:1},uygunsuzluklar:{v:1,e:1},personeller:{v:1,e:0},satinalma:{v:1,e:1},ayarlar:{v:1,e:0}},
+  Goruntuleyebilir:{dokumanlar:{v:1,e:0,satinalma:{v:1,e:0}},disKaynak:{v:1,e:0},lak:{v:1,e:0},pak:{v:1,e:0},araKontrol:{v:1,e:0},referans:{v:1,e:0},uygunsuzluklar:{v:1,e:0},personeller:{v:1,e:0},ayarlar:{v:0,e:0}}
 };
 
 function getActiveUser(){
@@ -705,10 +706,10 @@ function daysDiff(d){if(!d)return null;const diff=new Date(d)-new Date();return 
 function truncate(s,n=30){return s&&s.length>n?s.substr(0,n)+'…':s||''}
 
 function enColor(v){
-  if(v===null||v===''||v===undefined) return 'var(--text3)';
   const n=Number(v);
-  if(n<0.33) return 'var(--success)';
-  if(n<0.66) return 'var(--warn)';
+  if(isNaN(n)||n===0) return 'var(--text3)';
+  if(n<=0.9) return 'var(--success)';
+  if(n<=1.0) return '#f97316';
   return 'var(--danger)';
 }
 function enBar(v){
@@ -847,10 +848,10 @@ function renderDashboard(){
       }
     });
   }
-  if(ntypes.lak) addUpcoming(lak,'Lak','birSonrakiPlanliLak','lakAdi');
-  if(ntypes.pak) addUpcoming(pak,'Pak','birSonrakiPlanliPak','pakAdi');
-  if(ntypes.araKontrol) addUpcoming(ara,'Ara','birSonrakiPlanliAra','cihazAdi');
-  if(ntypes.referans) addUpcoming(ref,'Ref','birSonrakiKalibrasyon','cihazAdi');
+  addUpcoming(lak,'LAK','birSonrakiPlanliLak','lakAdi');
+  addUpcoming(pak,'PAK','birSonrakiPlanliPak','pakAdi');
+  addUpcoming(ara,'Ara Kontrol','birSonrakiPlanliAra','cihazAdi');
+  addUpcoming(ref,'Referans','birSonrakiKalibrasyon','cihazAdi');
 
   upcoming.sort((a,b)=>a.diff-b.diff);
 
@@ -1430,7 +1431,7 @@ async function geriAl(id){
 }
 
 // ==================== LAK / PAK ====================
-const KATEGORILER=['Boyut','Basınç','Kuvvet','Tork','Sıcaklık','Elektrik','Frekans','Yüksek Gerilim','Lüks','Diğer'];
+const KATEGORILER=()=>(DB.get('kategoriler')||['Boyut','Basınç','Kuvvet','Tork','Sıcaklık','Elektrik','Frekans','Yüksek Gerilim','Lüks','Diğer']);
 
 function renderLakPak(type){
   const mod=type;
@@ -1444,7 +1445,7 @@ function renderLakPak(type){
     </div>
     <div class="toolbar">
       <div class="tb-search"><svg class="s-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="lak-search" type="text" placeholder="${label} adı veya kodu ara..." oninput="renderLakTable('${type}')"></div>
-      <select class="tb-select" id="lak-kat" onchange="renderLakTable('${type}')"><option value="">Tüm Kategoriler</option>${KATEGORILER.map(k=>`<option>${k}</option>`).join('')}</select>
+      <select class="tb-select" id="lak-kat" onchange="renderLakTable('${type}')"><option value="">Tüm Kategoriler</option>${KATEGORILER().map(k=>`<option>${k}</option>`).join('')}</select>
       <select class="tb-select" id="lak-durum" onchange="renderLakTable('${type}')"><option value="">Tüm Durumlar</option><option>Sonuç Bekleniyor</option><option>Tamamlandı</option></select>
       <select class="tb-select" id="lak-sure" onchange="renderLakTable('${type}')"><option value="">Tüm Süreler</option><option value="30">30 Gün İçinde</option><option value="60">60 Gün İçinde</option><option value="90">90 Gün İçinde</option></select>
       <select class="tb-select" id="lak-sort" onchange="renderLakTable('${type}')"><option value="katilim">Katılım Tarihi</option><option value="sonuc">Sonuç Rapor</option><option value="sonraki">Sonraki Plan</option></select>
@@ -1675,7 +1676,7 @@ function addLakModal(type){
       </div>
       ${la?`<div class="form-group"><label>Düzenleyen Kuruluş</label><input id="l-kuruluş" type="text" placeholder="Kuruluş adı"></div>`:''}
       <div class="form-row">
-        <div class="form-group"><label>Kategori</label><select id="l-kat">${KATEGORILER.map(k=>`<option>${k}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Kategori</label><select id="l-kat">${KATEGORILER().map(k=>`<option>${k}</option>`).join('')}</select></div>
         <div class="form-group"><label>İlgili Standart</label><input id="l-standart" type="text" placeholder="ör. ISO/IEC 17025"></div>
       </div>
       <div class="form-row">
@@ -1966,7 +1967,7 @@ function renderAraKontrol(){
     </div>
     <div class="toolbar">
       <div class="tb-search"><svg class="s-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="ara-search" type="text" placeholder="Cihaz adı, marka, model, seri, envanter..." oninput="renderAraTable()"></div>
-      <select class="tb-select" id="ara-kat" onchange="renderAraTable()"><option value="">Tüm Kategoriler</option>${ARA_KATEGORILER.map(k=>`<option>${k}</option>`).join('')}</select>
+      <select class="tb-select" id="ara-kat" onchange="renderAraTable()"><option value="">Tüm Kategoriler</option>${ARA_KATEGORILER().map(k=>`<option>${k}</option>`).join('')}</select>
       <select class="tb-select" id="ara-durum" onchange="renderAraTable()"><option value="">Tüm Durumlar</option><option>Planlandı</option><option>Sonuç Bekleniyor</option><option>Tamamlandı</option><option>Gecikti</option></select>
       <select class="tb-select" id="ara-sort" onchange="renderAraTable()"><option value="tarih">Ara Kontrol Tarihi</option><option value="sonraki">Sonraki Planlanan</option><option value="envanter">Envanter No</option></select>
     </div>
@@ -2140,7 +2141,7 @@ function addAraModal(){
     <div id="ara-tab-bilgiler" class="modal-body">
       <div class="form-row">
         <div class="form-group"><label>Cihaz Adı</label><input id="a-cihaz" type="text" placeholder="Cihaz adını girin"></div>
-        <div class="form-group"><label>Kategori</label><select id="a-kat">${ARA_KATEGORILER.map(k=>`<option>${k}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Kategori</label><select id="a-kat">${ARA_KATEGORILER().map(k=>`<option>${k}</option>`).join('')}</select></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label>Marka</label><input id="a-marka" type="text"></div>
@@ -2480,7 +2481,7 @@ function addRefModal(){
     <div class="modal modal-lg"><div class="modal-header"><div class="modal-title" id="ref-modal-title">Cihaz Ekle</div><div class="modal-close" onclick="closeModal('ref-modal')">${icon('x-circle',16)}</div></div>
     <div class="modal-body">
       <div class="form-row">
-        <div class="form-group"><label>Kategori</label><select id="r-kategori">${KATEGORILER.map(k=>`<option>${k}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Kategori</label><select id="r-kategori">${KATEGORILER().map(k=>`<option>${k}</option>`).join('')}</select></div>
         <div class="form-group"><label>Cihaz Adı</label><input id="r-cihaz" type="text"></div>
       </div>
       <div class="form-row">
@@ -2745,7 +2746,7 @@ function renderPersonelTable(){
       </div>`).join('');
 
     // Belgeler özeti
-    const belgeOzet=PERSONEL_BELGE_KATEGORILER.map(k=>{
+    const belgeOzet=PERSONEL_BELGE_KATEGORILER().map(k=>{
       const count=(belgeler[k.id]||[]).length;
       return count>0?`<span onclick="showPersonelBelgeList('${p.id}','${k.id}')" style="font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(0,212,170,.1);color:var(--accent);cursor:pointer" onmouseover="this.style.background='rgba(0,212,170,.2)'" onmouseout="this.style.background='rgba(0,212,170,.1)'">${k.label}: ${count}</span>`:'';
     }).filter(Boolean).join('');
@@ -2941,7 +2942,7 @@ function renderPersonelBelgeler(){
   const p = persons.find(x => x.id === _editPersonelId);
   const belgeler = (p && p.belgeler) ? p.belgeler : {};
 
-  container.innerHTML = PERSONEL_BELGE_KATEGORILER.map(kat => {
+  container.innerHTML = PERSONEL_BELGE_KATEGORILER().map(kat => {
     const files = belgeler[kat.id] || [];
     return `
       <div style="margin-bottom:16px;border:1px solid var(--border);border-radius:10px;overflow:hidden">
@@ -3149,8 +3150,11 @@ function renderSatinAlmaTalep(){
         <option>Taslak</option>
         <option>Onay Bekliyor</option>
         <option>Onaylandı</option>
+        <option>TdrTamamlandi</option>
         <option>Reddedildi</option>
+        <option>Tamamlandı</option>
       </select>
+      <input type="month" class="tb-select" id="sat-tarih-ay" onchange="renderSATCards()" style="max-width:140px" title="Ay filtresi">
     </div>
     <div id="sat-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:16px;margin-top:8px"></div>
   </div>`;
@@ -3163,9 +3167,11 @@ function renderSATCards(){
   let items=DB.get('satinAlmaTalep')||[];
   const q=(document.getElementById('sat-search')?.value||'').toLowerCase();
   const durum=document.getElementById('sat-durum')?.value||'';
+  const ay=document.getElementById('sat-tarih-ay')?.value||'';
   items=items.filter(x=>{
     if(q&&!['talepNo','talepEden','tedarikci'].some(k=>x[k]?.toLowerCase().includes(q)))return false;
     if(durum&&x.durum!==durum)return false;
+    if(ay&&!(x.talepTarihi||'').startsWith(ay))return false;
     return true;
   });
   items.sort((a,b)=>(b.talepTarihi||'').localeCompare(a.talepTarihi||''));
@@ -3218,10 +3224,12 @@ function renderSATCards(){
             <button onclick="onaylaSAT('${x.id}','Onaylandı')" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(22,163,74,.4);background:transparent;color:#16a34a;cursor:pointer;font-size:12px">✅ Onayla</button>
             <button onclick="onaylaSAT('${x.id}','Reddedildi')" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(220,38,38,.4);background:transparent;color:#ef4444;cursor:pointer;font-size:12px">❌ Reddet</button>`:''}
           ${x.durum==='Onaylandı'&&canEdit('satinalma')?`<button onclick="acikDegerlendirme('${x.id}')" style="padding:5px 12px;border-radius:6px;border:1px solid rgba(79,107,240,.6);background:rgba(79,107,240,.15);color:var(--primary);cursor:pointer;font-size:12px;font-weight:600">⭐ Değerlendir</button>`:''}
+          ${x.durum==='TdrTamamlandi'&&canEdit('satinalma')?`<button onclick="acikRefCihazDegFromSAT('${x.id}')" style="padding:5px 12px;border-radius:6px;border:1px solid rgba(0,212,170,.6);background:rgba(0,212,170,.15);color:var(--accent);cursor:pointer;font-size:12px;font-weight:600">🔧 Ref. Cihaz Değerlendir</button>`:''}
           ${x.durum==='Taslak'&&canEdit('satinalma')?`<button onclick="onaylaSAT('${x.id}','Onay Bekliyor')" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(245,158,11,.4);background:transparent;color:#f59e0b;cursor:pointer;font-size:12px">📤 Onaya Gönder</button>`:''}
         </div>
         <div style="display:flex;gap:6px">
-          <button onclick="printSATPdf('${x.id}')" style="padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-size:12px">${icon('file-pdf',12)} PDF</button>
+          <button onclick="previewSATPdf('${x.id}')" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.06);color:#ef4444;cursor:pointer;font-size:12px">📄 PDF Önizle</button>
+          ${x.durum==='Tamamlandı'?`<button onclick="previewRCDPdf('${x.id}')" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.06);color:#ef4444;cursor:pointer;font-size:12px">📄 RCD PDF</button>`:''}
           ${canEdit('satinalma')?`<button onclick="openSATModal('${x.id}')" style="padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-size:12px">${icon('edit-2',12)} Düzenle</button>`:''}
           ${canEdit('satinalma')?`<button onclick="deleteSAT('${x.id}')" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(220,38,38,.4);background:transparent;color:#ef4444;cursor:pointer;font-size:12px">${icon('trash-2',12)} Sil</button>`:''}
         </div>
@@ -3322,8 +3330,9 @@ function openSATModal(id){
     _satUrunler=JSON.parse(JSON.stringify(x.urunler||[]));
   } else {
     const items=DB.get('satinAlmaTalep')||[];
-    const formNo=s.kalFormNo||'SAT';
-    document.getElementById('sat-no').value=formNo+'-'+(items.length+1).toString().padStart(3,'0');
+    const yil=new Date().getFullYear();
+    const yilItems=(items||[]).filter(x=>(x.talepNo||'').startsWith(yil+'-'));
+    document.getElementById('sat-no').value=yil+'-'+(yilItems.length+1).toString().padStart(3,'0');
     document.getElementById('sat-tarih').value=today();
     document.getElementById('sat-talep-eden').value='';
     document.getElementById('sat-istenen-tar').value='';
@@ -3365,6 +3374,13 @@ function saveSAT(durum){
   closeModal('sat-modal');
   toast(durum==='Taslak'?'Taslak kaydedildi':'Onaya gönderildi','success');
   renderSATCards();
+}
+
+
+function acikRefCihazDegFromSAT(satId){
+  const tdgItems=DB.get('tedDegerlendirme')||[];
+  const tdg=tdgItems.find(x=>x.satId===satId);
+  acikRefCihazDeg(satId, tdg?tdg.id:'');
 }
 
 function acikDegerlendirme(satId){
@@ -3546,9 +3562,7 @@ function printSATPdf(id){
   <script>window.onload=()=>{window.print();}<\/script>
 </body></html>`;
 
-  const w=window.open('','_blank','width=900,height=700');
-  w.document.write(html);
-  w.document.close();
+  return html;
 }
 
 
@@ -3568,6 +3582,7 @@ function renderTedDegerlendirme(){
         <option>Bekliyor</option>
         <option>Tamamlandı</option>
       </select>
+      <input type="month" class="tb-select" id="tdg-tarih-ay" onchange="renderTDGCards()" style="max-width:140px" title="Ay filtresi">
     </div>
     <div id="tdg-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:16px;margin-top:8px"></div>
   </div>`;
@@ -3580,9 +3595,11 @@ function renderTDGCards(){
   let items=DB.get('tedDegerlendirme')||[];
   const q=(document.getElementById('tdg-search')?.value||'').toLowerCase();
   const durum=document.getElementById('tdg-durum')?.value||'';
+  const tdgAy=document.getElementById('tdg-tarih-ay')?.value||'';
   items=items.filter(x=>{
     if(q&&![x.firmaAdi,x.talepNo,x.degerlendirmeKonusu].some(f=>f?.toLowerCase().includes(q)))return false;
     if(durum&&x.durum!==durum)return false;
+    if(tdgAy&&!(x.duzenlenmeTarihi||'').startsWith(tdgAy))return false;
     return true;
   });
   items.sort((a,b)=>(b.duzenlenmeTarihi||'').localeCompare(a.duzenlenmeTarihi||''));
@@ -3632,7 +3649,7 @@ function renderTDGCards(){
         </div>`:'<div style="color:var(--text3);font-size:12px">Değerlendirme bekleniyor...</div>'}
       </div>
       <div style="padding:10px 16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:6px">
-        ${x.durum==='Tamamlandı'?`<button onclick="printTDGPdf('${x.id}')" style="padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-size:12px">${icon('file-pdf',12)} PDF</button>`:''}
+        ${x.durum==='Tamamlandı'?`<button onclick="previewTDGPdf('${x.id}')" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.06);color:#ef4444;cursor:pointer;font-size:12px">📄 PDF Önizle</button>`:''}
         <button onclick="openTDGModal('${x.id}')" style="padding:5px 10px;border-radius:6px;border:1px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;font-size:12px">${icon('edit-2',12)} ${x.durum==='Tamamlandı'?'Düzenle':'Değerlendiri Yap'}</button>
       </div>
     </div>`;
@@ -3766,6 +3783,14 @@ function updateTDGToplam(){
   if(lbl) lbl.textContent=t>=70?'✅ Güvenilir Tedarikçi':t>=50?'⚠️ Şartlı':'❌ Güvenilir Değil';
 }
 
+
+function deleteTDG(id){
+  if(!confirm('Bu değerlendirmeyi silmek istediğinize emin misiniz?'))return;
+  DB.set('tedDegerlendirme',(DB.get('tedDegerlendirme')||[]).filter(x=>x.id!==id));
+  toast('Silindi','success');
+  renderTDGCards();
+}
+
 function openTDGModal(id){
   _editTDGId=id;
   const x=(DB.get('tedDegerlendirme')||[]).find(x=>x.id===id);if(!x)return;
@@ -3800,7 +3825,7 @@ function saveTDG(){
   // SAT kaydını da güncelle
   const satItems=DB.get('satinAlmaTalep')||[];
   const si=satItems.findIndex(x=>x.id===items[i].satId);
-  if(si>=0){ satItems[si].durum='Tamamlandı'; DB.set('satinAlmaTalep',satItems); }
+  if(si>=0){ satItems[si].durum='TdrTamamlandi'; DB.set('satinAlmaTalep',satItems); }
   DB.set('tedDegerlendirme',items);
   closeModal('tdg-modal');
   const toplam=calcTDGToplam(items[i]);
@@ -3914,8 +3939,7 @@ td{padding:5px 8px;border:1px solid #ccc}
 <div class="footer"><span>${firma}</span><span>${formNo} | Rev:${revNo} | ${revTar}</span></div>
 <script>window.onload=()=>{window.print();}<\/script>
 </body></html>`;
-  const w=window.open('','_blank','width=900,height=700');
-  w.document.write(html); w.document.close();
+  return html;
 }
 
 
@@ -3930,6 +3954,11 @@ function acikRefCihazDeg(satId, tdgId){
   if(!rec){
     const sat=(DB.get('satinAlmaTalep')||[]).find(x=>x.id===satId)||{};
     const tdg=(DB.get('tedDegerlendirme')||[]).find(x=>x.id===tdgId)||{};
+    const urunler=(sat.urunler||[]);
+    const cihazlar=urunler.filter(u=>u.refId).map(u=>({
+      refId:u.refId,cihazAdi:u.cihazAdi||u.aciklama||'',
+      marka:u.marka||'',model:u.model||'',seriNo:u.seriNo||'',demirbasNo:u.envanterNo||''
+    }));
     rec={
       id:'rcd_'+Date.now(),
       satId, tdgId,
@@ -3937,14 +3966,11 @@ function acikRefCihazDeg(satId, tdgId){
       firmaAdi:sat.tedarikci||'',
       degerlendirmeTarihi:today(),
       durum:'Bekliyor',
-      // Cihaz bilgileri
-      marka:'', model:'', seriNo:'', demirbasNo:'',
+      cihazlar:cihazlar.length?cihazlar:[{cihazAdi:'',marka:'',model:'',seriNo:'',demirbasNo:''}],
       kalFirma:sat.tedarikci||'',
       kalTarihi:'', etiketNo:'',
-      // 7 soru (E/H/-)
       s1:'', s2:'', s3:'', s4:'', s5:'', s6:'', s7:'',
-      dusunceler:'',
-      yapan:'',
+      dusunceler:'', yapan:'',
       dosyalar:[]
     };
     items.push(rec);
@@ -3973,14 +3999,7 @@ function buildRCDModal(){
       <!-- Değerlendirme Sekmesi -->
       <div id="rcd-panel-deg" class="modal-body" style="max-height:65vh;overflow-y:auto">
         <div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.5px;margin-bottom:10px">REFERANS CİHAZ BİLGİLERİ</div>
-        <div class="form-row">
-          <div class="form-group"><label>Marka</label><input id="rcd-marka" type="text"></div>
-          <div class="form-group"><label>Model</label><input id="rcd-model" type="text"></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label>Seri No</label><input id="rcd-serino" type="text"></div>
-          <div class="form-group"><label>Demirbaş No</label><input id="rcd-demno" type="text"></div>
-        </div>
+        <div id="rcd-cihaz-liste" style="margin-bottom:10px"></div>
         <div class="form-row">
           <div class="form-group"><label>Kalibrasyonu Yapan Firma</label><input id="rcd-kalfirma" type="text"></div>
           <div class="form-group"><label>Kalibrasyon Tarihi</label><input id="rcd-kaltar" type="date"></div>
@@ -4057,10 +4076,27 @@ function switchRCDTab(tab){
 }
 
 function fillRCDModal(rec){
-  document.getElementById('rcd-marka').value=rec.marka||'';
-  document.getElementById('rcd-model').value=rec.model||'';
-  document.getElementById('rcd-serino').value=rec.seriNo||'';
-  document.getElementById('rcd-demno').value=rec.demirbasNo||'';
+  const cihazEl=document.getElementById('rcd-cihaz-liste');
+  const cihazlar=rec.cihazlar||[];
+  if(cihazEl){
+    if(!cihazlar.length||!cihazlar[0].cihazAdi){
+      cihazEl.innerHTML='<div style="color:var(--text3);font-size:12px;padding:8px;border:1px dashed var(--border);border-radius:6px">Cihaz bilgisi bulunamadı</div>';
+    } else {
+      cihazEl.innerHTML=cihazlar.map(c=>`
+        <div style="padding:10px 12px;background:rgba(0,212,170,.06);border:1px solid rgba(0,212,170,.25);border-radius:8px;margin-bottom:6px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span style="font-size:16px">🔧</span>
+            <div style="font-weight:700;font-size:13px;color:var(--accent)">${c.cihazAdi||'-'}</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px;color:var(--text2)">
+            ${c.marka?`<div><span style="color:var(--text3)">Marka: </span>${c.marka}</div>`:''}
+            ${c.model?`<div><span style="color:var(--text3)">Model: </span>${c.model}</div>`:''}
+            ${c.seriNo?`<div><span style="color:var(--text3)">Seri No: </span>${c.seriNo}</div>`:''}
+            ${c.demirbasNo?`<div><span style="color:var(--text3)">Demirbaş: </span>${c.demirbasNo}</div>`:''}
+          </div>
+        </div>`).join('');
+    }
+  }
   document.getElementById('rcd-kalfirma').value=rec.kalFirma||'';
   document.getElementById('rcd-kaltar').value=rec.kalTarihi||'';
   document.getElementById('rcd-etiket').value=rec.etiketNo||'';
@@ -4145,8 +4181,6 @@ function saveRCD(){
   const i=items.findIndex(x=>x.id===_editRCDId);if(i<0)return;
   const getVal=id=>document.getElementById(id)?.value||'';
   items[i]={...items[i],
-    marka:getVal('rcd-marka'), model:getVal('rcd-model'),
-    seriNo:getVal('rcd-serino'), demirbasNo:getVal('rcd-demno'),
     kalFirma:getVal('rcd-kalfirma'), kalTarihi:getVal('rcd-kaltar'),
     etiketNo:getVal('rcd-etiket'), dusunceler:getVal('rcd-dusunceler'),
     yapan:getVal('rcd-yapan'), degerlendirmeTarihi:getVal('rcd-tarih'),
@@ -4166,6 +4200,189 @@ function saveRCD(){
   else if(document.getElementById('tdg-cards')) renderTDGCards();
 }
 
+
+function previewSATPdf(id){
+  const html=printSATPdf(id);
+  if(!html) return;
+  const w=window.open('','_blank','width=950,height=750');
+  w.document.write(html.replace(/<script[^>]*>window\.onload[^<]*<\/script>/,''));
+  w.document.close();
+}
+
+function previewTDGPdf(id){
+  const html=printTDGPdf(id);
+  if(!html) return;
+  const w=window.open('','_blank','width=950,height=750');
+  w.document.write(html.replace(/<script[^>]*>window\.onload[^<]*<\/script>/,''));
+  w.document.close();
+}
+
+function previewTedPdf(){
+  const html=printTedPdf();
+  if(!html) return;
+  const w=window.open('','_blank','width=950,height=750');
+  w.document.write(html.replace(/<script[^>]*>window\.onload[^<]*<\/script>/,''));
+  w.document.close();
+}
+
+function printRCDPdf(satId){
+  const rcdItems=DB.get('refCihazDeg')||[];
+  const x=rcdItems.find(r=>r.satId===satId);if(!x) return null;
+  const s=DB.get('settings')||{};
+  const firma=s.firmName||'';
+  const formNo=s.rcdFormNo||'AKFG794';
+  const revNo=s.rcdRevNo||'01';
+  const revTar=s.rcdRevTar?formatDate(s.rcdRevTar):'--.--.----';
+  const cihazlar=x.cihazlar||[];
+  const sorular=[
+    {no:'1',label:'Referans cihazın dış görünüşünde problem var mı?',val:x.s1},
+    {no:'2',label:'Referans cihaz kalibrasyon sonrası sorunsuz çalışıyor mu?',val:x.s2},
+    {no:'3',label:'Referans cihaz ve firma bilgileri sertifikada doğru yazılmış mı?',val:x.s3},
+    {no:'4',label:'Kalibrasyon sırasında istenilen değerlerde ölçümler yapılmış mı?',val:x.s4},
+    {no:'5',label:'Belirsizlik değerleri firma beyanı ile uyuşuyor mu?',val:x.s5},
+    {no:'6',label:'Ölçüm sonuçlarında uygunsuzluk var mı?',val:x.s6},
+    {no:'7',label:'Kalibrasyon sonrası referans cihaz kullanıma uygun mu?',val:x.s7}
+  ];
+  const cihazRows=cihazlar.map(c=>`<tr><td>${c.cihazAdi||'-'}</td><td>${c.marka||'-'}</td><td>${c.model||'-'}</td><td>${c.seriNo||'-'}</td><td>${c.demirbasNo||'-'}</td></tr>`).join('');
+  const soruRows=sorular.map(s=>`<tr><td style="padding-left:8px">${s.no}. ${s.label}</td><td style="text-align:center;font-weight:700;color:${s.val==='E'?'#16a34a':s.val==='H'?'#dc2626':'#888'}">${s.val==='E'?'EVET':s.val==='H'?'HAYIR':'-'}</td></tr>`).join('');
+  return `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><title>${formNo}</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:11px;color:#111;padding:20px}
+.ht{width:100%;border-collapse:collapse;border:1px solid #000;margin-bottom:12px}
+.ht td{border:1px solid #000;padding:6px 10px;vertical-align:middle}
+.title{font-size:13px;font-weight:700;text-align:center}
+.sec{margin-bottom:12px}.sec-title{font-weight:700;font-size:11px;background:#1e293b;color:#fff;padding:5px 8px}
+table{width:100%;border-collapse:collapse}
+th{background:#334155;color:#fff;padding:5px 8px;border:1px solid #555;font-size:10px;text-align:left}
+td{padding:5px 8px;border:1px solid #ccc;font-size:10px}tr:nth-child(even){background:#f8fafc}
+.ig{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+.ib{border:1px solid #ccc;padding:6px 8px;border-radius:4px}
+.lbl{font-size:9px;color:#666;margin-bottom:2px}.val{font-size:11px;font-weight:600;border-bottom:1px solid #ccc;padding-bottom:2px;min-height:16px}
+.onay{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;border:1px solid #ccc;padding:10px;border-radius:4px}
+.imza{border-top:1px solid #333;margin-top:28px;padding-top:3px;text-align:center;font-size:10px}
+.footer{margin-top:10px;border-top:1px solid #ccc;padding-top:6px;display:flex;justify-content:space-between;font-size:9px;color:#666}
+</style></head><body>
+<table class="ht"><tr>
+  <td style="width:25%;font-weight:700;font-size:13px">${firma}</td>
+  <td class="title">REFERANS CİHAZ KALİBRASYON SONRASI DEĞERLENDİRME FORMU</td>
+  <td style="width:22%;font-size:10px">
+    <div style="display:flex;justify-content:space-between"><span>Form No:</span><b>${formNo}</b></div>
+    <div style="display:flex;justify-content:space-between"><span>Rev. No:</span><b>${revNo}</b></div>
+    <div style="display:flex;justify-content:space-between"><span>Rev. Tar.:</span><b>${revTar}</b></div>
+  </td>
+</tr></table>
+<div class="ig">
+  <div class="ib"><div class="lbl">Talep No</div><div class="val">${x.talepNo||'-'}</div></div>
+  <div class="ib"><div class="lbl">Kalibrasyonu Yapan Firma</div><div class="val">${x.kalFirma||'-'}</div></div>
+  <div class="ib"><div class="lbl">Kalibrasyon Tarihi</div><div class="val">${formatDate(x.kalTarihi)||'-'}</div></div>
+  <div class="ib"><div class="lbl">Kalibrasyon Etiket No</div><div class="val">${x.etiketNo||'-'}</div></div>
+  <div class="ib"><div class="lbl">Değerlendirme Tarihi</div><div class="val">${formatDate(x.degerlendirmeTarihi)||'-'}</div></div>
+  <div class="ib"><div class="lbl">Değerlendirmeyi Yapan</div><div class="val">${x.yapan||'-'}</div></div>
+</div>
+<div class="sec"><div class="sec-title">REFERANS CİHAZ BİLGİLERİ</div>
+<table><thead><tr><th>Cihaz Adı</th><th>Marka</th><th>Model</th><th>Seri No</th><th>Demirbaş No</th></tr></thead>
+<tbody>${cihazRows||'<tr><td colspan="5" style="text-align:center">-</td></tr>'}</tbody></table></div>
+<div class="sec"><div class="sec-title">DEĞERLENDİRME SORULARI</div>
+<table><thead><tr><th>Soru</th><th style="width:80px;text-align:center">Cevap</th></tr></thead>
+<tbody>${soruRows}</tbody></table></div>
+${x.dusunceler?`<div class="sec"><div class="sec-title">DÜŞÜNCELER</div><div style="padding:8px;border:1px solid #ccc;font-size:10px">${x.dusunceler}</div></div>`:''}
+<div class="onay">
+  <div><div style="font-weight:700;font-size:11px;margin-bottom:6px">DEĞERLENDİRMEYİ YAPAN</div>
+  <div style="font-size:11px">${x.yapan||''}</div><div class="imza">İmza / Tarih: ${formatDate(x.degerlendirmeTarihi)||''}</div></div>
+  <div><div style="font-weight:700;font-size:11px;margin-bottom:6px">ONAY</div><div class="imza">İmza / Tarih:</div></div>
+</div>
+<div class="footer"><span>${firma}</span><span>${formNo} | Rev:${revNo} | ${revTar}</span></div>
+</body></html>`;
+}
+
+function previewRCDPdf(satId){
+  const html=printRCDPdf(satId);
+  if(!html){toast('Henüz referans cihaz değerlendirmesi yok','warn');return;}
+  const w=window.open('','_blank','width=950,height=750');
+  w.document.write(html);
+  w.document.close();
+}
+
+/* ===== REF CİHAZ SEÇİM MODALİ ===== */
+let _satRefTumListe=[];
+
+function buildSATRefModal(){
+  const div=document.createElement('div');
+  div.innerHTML=`<div id="sat-ref-sec-modal" class="modal-overlay">
+    <div class="modal" style="max-width:520px">
+      <div class="modal-header">
+        <div class="modal-title">🔧 Referans Cihaz Seç</div>
+        <div class="modal-close" onclick="document.getElementById('sat-ref-sec-modal').style.display='none'">${icon('x-circle',16)}</div>
+      </div>
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:6px 10px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="sat-ref-ara" type="text" placeholder="Cihaz adı, marka, model, seri no ara..." oninput="filterSATRefListe()" style="border:none;background:transparent;outline:none;font-size:12px;flex:1">
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:6px">Tek cihaz seçin — seçilince otomatik kapanır</div>
+      </div>
+      <div class="modal-body" style="max-height:55vh;overflow-y:auto">
+        <div id="sat-ref-sec-liste"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="document.getElementById('sat-ref-sec-modal').style.display='none'">İptal</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(div);
+}
+
+function openSATRefCihazSec(){
+  if(!document.getElementById('sat-ref-sec-modal')) buildSATRefModal();
+  _satRefTumListe=DB.get('referans')||[];
+  const arama=document.getElementById('sat-ref-ara');
+  if(arama) arama.value='';
+  renderSATRefListe(_satRefTumListe);
+  document.getElementById('sat-ref-sec-modal').style.display='flex';
+}
+
+function filterSATRefListe(){
+  const q=(document.getElementById('sat-ref-ara')?.value||'').toLowerCase();
+  const filtered=q?_satRefTumListe.filter(c=>
+    [c.cihazAdi,c.marka,c.model,c.seriNo,c.envanterNo].some(f=>f?.toLowerCase().includes(q))
+  ):_satRefTumListe;
+  renderSATRefListe(filtered);
+}
+
+function renderSATRefListe(items){
+  const liste=document.getElementById('sat-ref-sec-liste');
+  if(!liste) return;
+  const seciliId=_satUrunler[0]?.refId||null;
+  if(!items.length){liste.innerHTML='<div style="color:var(--text3);font-size:12px;padding:20px;text-align:center">Cihaz bulunamadı.</div>';return;}
+  liste.innerHTML=items.map(c=>{
+    const secili=c.id===seciliId;
+    const ad=(c.cihazAdi||'').replace(/'/g,"\\'");
+    const mk=(c.marka||'').replace(/'/g,"\\'");
+    const ml=(c.model||'').replace(/'/g,"\\'");
+    const sn=(c.seriNo||'').replace(/'/g,"\\'");
+    const en=(c.envanterNo||'').replace(/'/g,"\\'");
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:${secili?'rgba(0,212,170,.12)':'rgba(0,0,0,.05)'};border-radius:8px;border:2px solid ${secili?'var(--accent)':'var(--border)'};margin-bottom:6px;cursor:pointer" onclick="secSATRefCihaz('${c.id}','${ad}','${mk}','${ml}','${sn}','${en}')">
+      <div style="width:22px;height:22px;border-radius:50%;border:2px solid ${secili?'var(--accent)':'var(--border)'};background:${secili?'var(--accent)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        ${secili?'<span style="color:#fff;font-size:12px">✓</span>':''}
+      </div>
+      <span style="font-size:18px">🔧</span>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600">${c.cihazAdi||'-'}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">${[c.marka,c.model,c.seriNo?'S/N: '+c.seriNo:'',c.envanterNo?'Env: '+c.envanterNo:''].filter(Boolean).join(' · ')}</div>
+      </div>
+      ${secili?'<span style="color:var(--accent);font-size:16px">✅</span>':''}
+    </div>`;
+  }).join('');
+}
+
+function secSATRefCihaz(id,cihazAdi,marka,model,seriNo,envanterNo){
+  _satUrunler=[{refId:id,cihazAdi,marka,model,seriNo,envanterNo,
+    aciklama:cihazAdi+' Kalibrasyonu',miktar:1,birim:'Adet',ozellikler:''}];
+  setTimeout(()=>{
+    document.getElementById('sat-ref-sec-modal').style.display='none';
+    renderSATUrunler();
+  },250);
+}
+
 function renderTedarikci(){
   if(!canView('satinalma')){document.getElementById('content').innerHTML='<div class="empty-state"><p>Bu modülü görüntüleme yetkiniz yok.</p></div>';return;}
   const c=document.getElementById('content');
@@ -4173,7 +4390,7 @@ function renderTedarikci(){
     <div class="section-header">
       <div class="section-title">Onaylı Tedarikçiler</div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-ghost" onclick="printTedPdf()">${icon('file-pdf',14)} PDF Çıktı Al</button>
+        <button class="btn btn-ghost" onclick="previewTedPdf()">${icon('file-pdf',14)} PDF Önizle</button>
         ${canEdit('satinalma')?`<button class="btn btn-primary" onclick="openTedarikciModal(null)">${icon('plus',14)} Tedarikçi Ekle</button>`:`<button class="btn btn-ghost" disabled>${icon('plus',14)} Ekle</button>`}
       </div>
     </div>
@@ -4394,6 +4611,22 @@ function renderAyarlar(){
   const s=DB.get('settings')||{};
   const c=document.getElementById('content');
   c.innerHTML=`<div class="page">
+    <!-- KATEGORİLER -->
+    <div class="card" style="margin-bottom:18px">
+      <div class="section-title" style="margin-bottom:4px;font-size:15px">${icon('tag',16)} Kategori Yönetimi</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:14px">LAK/PAK, Ara Kontrol ve Referans Cihaz modüllerinde kullanılır</div>
+      <div id="kat-liste" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        ${(DB.get('kategoriler')||[]).map((k,i)=>`
+          <div style="display:flex;align-items:center;gap:4px;background:rgba(0,212,170,.1);border:1px solid rgba(0,212,170,.3);border-radius:20px;padding:4px 10px">
+            <span style="font-size:12px">${k}</span>
+            <button onclick="deleteKategori(${i})" style="background:transparent;border:none;color:#ef4444;cursor:pointer;font-size:14px;line-height:1;padding:0 2px">×</button>
+          </div>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px">
+        <input id="kat-yeni" type="text" placeholder="Yeni kategori adı..." style="flex:1" onkeydown="if(event.key==='Enter')addKategori()">
+        <button class="btn btn-primary btn-sm" onclick="addKategori()">${icon('plus',13)} Ekle</button>
+      </div>
+    </div>
     <!-- FİRMA -->
     <div class="card" style="margin-bottom:18px">
       <div class="section-title" style="margin-bottom:18px;font-size:15px">${icon('image',16)} Firma ve Logo</div>
@@ -4530,6 +4763,29 @@ function renderAyarlar(){
       </div>
     </div>
   </div>`;
+}
+
+
+function addKategori(){
+  const inp=document.getElementById('kat-yeni');
+  if(!inp) return;
+  const v=inp.value.trim();
+  if(!v){toast('Kategori adı girin','error');return;}
+  const cats=DB.get('kategoriler')||[];
+  if(cats.includes(v)){toast('Bu kategori zaten var','warn');return;}
+  cats.push(v);
+  DB.set('kategoriler',cats);
+  inp.value='';
+  toast('Kategori eklendi','success');
+  renderAyarlar();
+}
+
+function deleteKategori(i){
+  const cats=DB.get('kategoriler')||[];
+  cats.splice(i,1);
+  DB.set('kategoriler',cats);
+  toast('Kategori silindi','success');
+  renderAyarlar();
 }
 
 function saveFirm(){
