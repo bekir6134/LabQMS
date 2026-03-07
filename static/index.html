@@ -495,6 +495,7 @@ DB.def('pak',[]);
 DB.def('pakHistory',[]);
 DB.def('araKontrol',[]);
 DB.def('referans',[]);
+DB.def('refHistory',[]);
 DB.def('activityLog',[]);
 DB.def('referansHistory',[]);
 DB.def('uygunsuzluklar',[]);
@@ -536,14 +537,8 @@ const NAV_ITEMS = [
     {id:'dis-kaynak-listesi',label:'Dış Kaynaklı Dökümanlar',icon:'file-text',page:'dis-kaynak-listesi',mod:'disKaynak'},
     {id:'dis-kaynak-gecmisi',label:'Dış Kaynak Geçmişi',icon:'clock',page:'dis-kaynak-gecmisi',mod:'disKaynak'}
   ]},
-  {id:'lak',label:'Lak/Yt',icon:'activity',mod:'lak',children:[
-    {id:'lak-listesi',label:'Lak Listesi',icon:'layers',page:'lak-listesi',mod:'lak'},
-    {id:'lak-gecmisi',label:'Lak Geçmişi',icon:'clock',page:'lak-gecmisi',mod:'lak'}
-  ]},
-  {id:'pak',label:'Pak',icon:'users',mod:'pak',children:[
-    {id:'pak-listesi',label:'Pak Listesi',icon:'layers',page:'pak-listesi',mod:'pak'},
-    {id:'pak-gecmisi',label:'Pak Geçmişi',icon:'clock',page:'pak-gecmisi',mod:'pak'}
-  ]},
+    {id:'lak',label:'Lak/Yt',icon:'activity',page:'lak-listesi',mod:'lak'},
+  {id:'pak',label:'Pak',icon:'users',page:'pak-listesi',mod:'pak'},,
   {id:'ara-kontrol',label:'Ara Kontrol',icon:'shield-check',page:'ara-kontrol',mod:'araKontrol'},
   {id:'referans',label:'Referans Cihazlar',icon:'cpu',mod:'referans',children:[
     {id:'referans-listesi',label:'Referans Listesi',icon:'layers',page:'referans',mod:'referans'},
@@ -553,10 +548,7 @@ const NAV_ITEMS = [
     {id:'satin-alma-talep',label:'Kalibrasyon Satın Alma',icon:'clipboard',page:'satin-alma-talep',mod:'satinalma'},
     {id:'tedarikci-listesi',label:'Onaylı Tedarikçiler',icon:'check-circle',page:'tedarikci-listesi',mod:'satinalma'}
   ]},
-  {id:'uygunsuzluklar',label:'Uygunsuzluklar',icon:'alert-triangle',mod:'uygunsuzluklar',children:[
-    {id:'uygunsuzluk-listesi',label:'Uygunsuzluk Listesi',icon:'layers',page:'uygunsuzluk-listesi',mod:'uygunsuzluklar'},
-    {id:'uygunsuzluk-gecmisi',label:'Uygunsuzluk Geçmişi',icon:'clock',page:'uygunsuzluk-gecmisi',mod:'uygunsuzluklar'}
-  ]},
+  {id:'uygunsuzluklar',label:'Uygunsuzluklar',icon:'alert-triangle',page:'uygunsuzluk-listesi',mod:'uygunsuzluklar'},
   {id:'personeller',label:'Personeller',icon:'user',page:'personeller',mod:'personeller'},
   {id:'ayarlar',label:'Ayarlar',icon:'settings',page:'ayarlar',mod:'ayarlar'}
 ];
@@ -1358,7 +1350,11 @@ function saveRevize(){
   docs[i].revTarihi=today();
   docs[i].durum='Revizyonda';
   const not=document.getElementById('rv-not').value;
-  revs.push({id:uid(),ts:new Date().toISOString(),docId:_revizeDocId,kod:docs[i].kod,tip:docs[i].tip,ad:docs[i].ad,eskiRev:old.revNo,yeniRev:docs[i].revNo,not,yapan:u?`${u.ad} ${u.soyad}`:'Sistem',files:docs[i].files||[]});
+  revs.push({id:uid(),ts:new Date().toISOString(),docId:_revizeDocId,kod:docs[i].kod,tip:docs[i].tip,ad:docs[i].ad,eskiRev:old.revNo,yeniRev:docs[i].revNo,not,yapan:u?`${u.ad} ${u.soyad}`:'Sistem',files:docs[i].files||[],pdfFile:old.pdfFile||null,officeFile:old.officeFile||null});
+  // Revizyon sonrası dokümanın dosyalarını temizle - yeniden yüklenecek
+  docs[i].pdfFile=null;
+  docs[i].officeFile=null;
+  docs[i].files=[];
   DB.set('documents',docs);
   DB.set('docRevisions',revs);
   logActivity('revize','dokumanlar',{desc:`Döküman revize edildi: ${docs[i].kod} Rev${docs[i].revNo}`});
@@ -1412,12 +1408,55 @@ function renderRevizyonGecmisi(){
       <input class="tb-select" id="rv-date2" type="date" onchange="renderRevTable()" style="padding:7px 10px">
     </div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Tarih/Saat</th><th>Kod</th><th>Tip</th><th>Ad</th><th>Eski Rev</th><th>Yeni Rev</th><th>Not</th><th>Yapan</th><th>İşlemler</th></tr></thead>
+      <thead><tr><th>Tarih/Saat</th><th>Kod</th><th>Tip</th><th>Ad</th><th>Eski Rev</th><th>Yeni Rev</th><th>Not</th><th>Yapan</th><th>Dosyalar</th><th>İşlemler</th></tr></thead>
       <tbody id="rv-tbody"></tbody>
     </table></div>
   </div>`;
   renderRevTable();
 }
+
+function revGecmisGoruntule(revId, tip){
+  const revs=DB.get('docRevisions')||[];
+  const r=revs.find(x=>x.id===revId); if(!r) return;
+  const dosya=tip==='pdf'?r.pdfFile:r.officeFile;
+  if(!dosya){toast('Dosya bulunamadı','error');return;}
+  const isPdf=dosya.name.toLowerCase().endsWith('.pdf');
+  const isExcel=dosya.name.toLowerCase().match(/\.xlsx?$/);
+  if(isPdf){
+    const w=window.open('');
+    w.document.write(`<!DOCTYPE html><html><body style="margin:0"><iframe src="${dosya.data}" style="width:100%;height:100vh;border:none"></iframe></body></html>`);
+  } else if(isExcel){
+    const w=window.open('','_blank','width=1000,height:700');
+    w.document.write(`<!DOCTYPE html><html><head><title>${dosya.name}</title>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"><\/script>
+      <style>body{font-family:sans-serif;margin:0;background:#1a1a2e;color:#e0e0e0}.tb{background:#16213e;padding:10px 16px;display:flex;gap:8px;align-items:center;border-bottom:1px solid #333}table{border-collapse:collapse;width:100%;font-size:12px}th{background:#2d3561;color:#fff;padding:6px 10px;border:1px solid #444}td{padding:5px 10px;border:1px solid #333;background:#1e1e2e}.sb{padding:4px 10px;border-radius:4px;border:1px solid #444;background:transparent;color:#ccc;cursor:pointer;font-size:12px}.sb.a{background:#4f6bf0;color:#fff}</style>
+    </head><body>
+    <div class="tb"><b>📝 ${dosya.name}</b><div id="st"></div><a href="${dosya.data}" download="${dosya.name}" style="margin-left:auto;padding:5px 12px;background:#4f6bf0;color:#fff;border-radius:6px;text-decoration:none;font-size:12px">⬇ İndir</a></div>
+    <div id="tc" style="padding:12px;overflow:auto">Yükleniyor...</div>
+    <script>
+      const b64='${dosya.data.split(',')[1]||dosya.data}';
+      const bin=atob(b64);const arr=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+      const wb=XLSX.read(arr,{type:'array'});
+      function show(n){document.querySelectorAll('.sb').forEach(b=>b.classList.toggle('a',b.dataset.n===n));document.getElementById('tc').innerHTML=XLSX.utils.sheet_to_html(wb.Sheets[n]);}
+      wb.SheetNames.forEach(n=>{const b=document.createElement('button');b.className='sb';b.dataset.n=n;b.textContent=n;b.onclick=()=>show(n);document.getElementById('st').appendChild(b);});
+      if(wb.SheetNames.length)show(wb.SheetNames[0]);
+    <\/script></body></html>`);
+  } else {
+    const w=window.open('');
+    w.document.write(`<p style="font-family:sans-serif;padding:20px">Önizleme desteklenmiyor.</p><a href="${dosya.data}" download="${dosya.name}">İndir</a>`);
+  }
+}
+
+function revGecmisIndir(revId, tip){
+  const revs=DB.get('docRevisions')||[];
+  const r=revs.find(x=>x.id===revId); if(!r) return;
+  const dosya=tip==='pdf'?r.pdfFile:r.officeFile;
+  if(!dosya){toast('Dosya bulunamadı','error');return;}
+  const a=document.createElement('a');
+  a.href=dosya.data; a.download=dosya.name; a.click();
+}
+
 function renderRevTable(){
   const tbody=document.getElementById('rv-tbody');if(!tbody)return;
   let revs=DB.get('docRevisions')||[];
@@ -1442,7 +1481,16 @@ function renderRevTable(){
     <td><span class="badge badge-blue">${r.yeniRev}</span></td>
     <td style="max-width:150px;color:var(--text3)">${truncate(r.not,30)}</td>
     <td>${r.yapan||'-'}</td>
+    <td style="font-size:11px">
+      ${r.pdfFile?`<div style="color:var(--danger)">📄 ${r.pdfFile.name}</div>`:''}
+      ${r.officeFile?`<div style="color:var(--primary)">📝 ${r.officeFile.name}</div>`:''}
+      ${!r.pdfFile&&!r.officeFile?'<span style="color:var(--text3)">-</span>':''}
+    </td>
     <td><div class="action-btns">
+      ${r.pdfFile?`<button class="icon-btn" title="PDF Görüntüle" onclick="revGecmisGoruntule('${r.id}','pdf')" style="color:var(--danger)">${icon('file-text',13)}</button>`:''}
+      ${r.pdfFile?`<button class="icon-btn" title="PDF İndir" onclick="revGecmisIndir('${r.id}','pdf')" style="color:var(--danger)">${icon('download',13)}</button>`:''}
+      ${r.officeFile?`<button class="icon-btn" title="${r.officeFile.name} Görüntüle" onclick="revGecmisGoruntule('${r.id}','office')" style="color:var(--primary)">${icon('file',13)}</button>`:''}
+      ${r.officeFile?`<button class="icon-btn" title="${r.officeFile?.name||'Dosya'} İndir" onclick="revGecmisIndir('${r.id}','office')" style="color:var(--primary)">${icon('download',13)}</button>`:''}
       ${canEdit('dokumanlar')?`<button class="icon-btn" title="Geri Al" onclick="geriAl('${r.id}')">${icon('rotate-ccw',13)}</button>`:''}
     </div></td>
   </tr>`).join('');
@@ -1487,7 +1535,10 @@ function renderLakTable(type){
   const kat=document.getElementById('lak-kat')?.value||'';
   const durum=document.getElementById('lak-durum')?.value||'';
   const la=type==='lak';
+  const lakYil=document.getElementById('lak-yil')?.value||'';
   items=items.filter(x=>{
+    const _lakTar=la?x.sonucRaporTarihi:x.pakKatilimTarihi;
+    if(lakYil&&!(_lakTar||'').startsWith(lakYil))return false;
     const name=la?x.lakAdi:x.pakAdi;
     const kod=la?x.lakKodu:x.pakKodu;
     if(q&&!(name?.toLowerCase().includes(q)||kod?.toLowerCase().includes(q)))return false;
@@ -1994,6 +2045,10 @@ function renderAraKontrol(){
       <select class="tb-select" id="ara-kat" onchange="renderAraTable()"><option value="">Tüm Kategoriler</option>${ARA_KATEGORILER().map(k=>`<option>${k}</option>`).join('')}</select>
       <select class="tb-select" id="ara-durum" onchange="renderAraTable()"><option value="">Tüm Durumlar</option><option>Planlandı</option><option>Sonuç Bekleniyor</option><option>Tamamlandı</option><option>Gecikti</option></select>
       <select class="tb-select" id="ara-sort" onchange="renderAraTable()"><option value="tarih">Ara Kontrol Tarihi</option><option value="sonraki">Sonraki Planlanan</option><option value="envanter">Envanter No</option></select>
+      <select class="tb-select" id="ara-yil" onchange="renderAraTable()" style="max-width:100px">
+        <option value="">Tüm Yıllar</option>
+        ${Array.from({length:5},(_,i)=>new Date().getFullYear()-i).map(y=>`<option value="${y}">${y}</option>`).join('')}
+      </select>
     </div>
     <div id="ara-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px;margin-top:8px"></div>
   </div>`;
@@ -2012,7 +2067,9 @@ function renderAraTable(){
     if(!x.manualDurum&&x.birSonrakiPlanliAra&&x.birSonrakiPlanliAra<todayStr&&x.durum!=='Tamamlandı') x.durum='Gecikti';
     return x;
   });
+  const araYil=document.getElementById('ara-yil')?.value||'';
   items=items.filter(x=>{
+    if(araYil&&!(x.kalibrasyonTarihi||x.tarih||'').startsWith(araYil))return false;
     const fields=[x.cihazAdi,x.marka,x.model,x.seriNo,x.envanterNo];
     if(q&&!fields.some(f=>f?.toLowerCase().includes(q)))return false;
     if(kat&&x.kategori!==kat)return false;
@@ -2413,6 +2470,7 @@ function renderRefTable(){
     {key:'kalibrasyonNo',   label:'Kalibrasyon No'},
     {key:'kalibrasyonTarihi',      label:'Kalibrasyon Tarihi'},
     {key:'birSonrakiKalibrasyon',  label:'Sonraki Kalibrasyon'},
+    {key:'izlenebilirlik',        label:'İzlenebilirlik'},
     {key:'degerlendirmeKriteri',   label:'Değerlendirme Kriteri'},
     {key:'_durum',          label:'Durum'},
   ];
@@ -2445,9 +2503,11 @@ function renderRefTable(){
     <td>${x.kalibrasyonNo||'-'}</td>
     <td>${formatDate(x.kalibrasyonTarihi)}</td>
     <td>${formatDate(x.birSonrakiKalibrasyon)}</td>
+    <td style="font-size:11.5px">${x.izlenebilirlik||'-'}</td>
     <td style="font-size:11.5px">${x.degerlendirmeKriteri||'-'}</td>
     <td><span class="badge ${durumBadge[x._durum]||'badge-gray'}">${x._durum||'-'}</span>${x.manualDurum?'<span style="font-size:10px;color:var(--text3);margin-left:4px">manuel</span>':''}</td>
-    <td><div class="action-btns">
+    <td style="min-width:260px"><div class="action-btns" style="flex-wrap:nowrap;gap:4px">
+      ${canEdit('referans')?`<button onclick="openYeniKalModal('${x.id}')" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(0,212,170,.5);background:rgba(0,212,170,.1);color:var(--accent);cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap">🔄 Yeni Kal.</button>`:''}
       ${canEdit('referans')?`<button class="icon-btn" title="PDF Yükle" onclick="uploadRefFile('${x.id}','pdf')" style="color:var(--danger);border-color:rgba(240,82,82,.2)">${icon('upload',12)}<span style="font-size:10px;margin-left:2px">PDF</span></button>`:''}
       ${x.pdfFile?`<button class="icon-btn" title="PDF Önizle" onclick="previewRefFileById('${x.id}','pdf')" style="color:var(--danger);border-color:rgba(240,82,82,.2)">${icon('eye',12)}</button>`:''}
       ${canEdit('referans')?`<button class="icon-btn" title="Word/Excel Yükle" onclick="uploadRefFile('${x.id}','office')" style="color:var(--accent);border-color:rgba(0,212,170,.2)">${icon('upload',12)}<span style="font-size:10px;margin-left:2px">W/E</span></button>`:''}
@@ -2468,6 +2528,111 @@ async function deleteRef(id){
   DB.set('referans',items.filter(i=>i.id!==id));
   toast('Silindi','success');renderRefTable();
 }
+
+let _yeniKalRefId=null;
+
+function openYeniKalModal(id){
+  _yeniKalRefId=id;
+  const items=DB.get('referans')||[];
+  const x=items.find(r=>r.id===id); if(!x) return;
+  // Modal yoksa oluştur
+  if(!document.getElementById('yenikal-modal')){
+    const div=document.createElement('div');
+    div.innerHTML=`<div id="yenikal-modal" class="modal-overlay">
+      <div class="modal" style="max-width:580px">
+        <div class="modal-header">
+          <div class="modal-title">🔄 Yeni Kalibrasyon Kaydı</div>
+          <div class="modal-close" onclick="closeModal('yenikal-modal')">${icon('x-circle',16)}</div>
+        </div>
+        <div class="modal-body" style="display:flex;flex-direction:column;gap:20px">
+          <div id="yenikal-cihaz-info" style="background:rgba(0,212,170,.08);border:1px solid rgba(0,212,170,.25);border-radius:10px;padding:14px 18px;font-size:13px"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <div style="grid-column:1/-1">
+              <label style="display:block;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Yeni Kalibrasyon No <span style="color:var(--danger)">*</span></label>
+              <input id="yenikal-no" type="text" style="width:100%;padding:11px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);font-size:14px" placeholder="Kalibrasyon sertifika numarası...">
+            </div>
+            <div>
+              <label style="display:block;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Kalibrasyon Tarihi <span style="color:var(--danger)">*</span></label>
+              <input id="yenikal-tarih" type="date" style="width:100%;padding:11px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);font-size:14px">
+            </div>
+            <div>
+              <label style="display:block;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Gelecek Kalibrasyon Tarihi <span style="color:var(--danger)">*</span></label>
+              <input id="yenikal-sonraki" type="date" style="width:100%;padding:11px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);font-size:14px">
+            </div>
+            <div style="grid-column:1/-1">
+              <label style="display:block;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">İzlenebilirlik</label>
+              <input id="yenikal-izlenebilirlik" type="text" style="width:100%;padding:11px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);font-size:14px" placeholder="TÜBİTAK UME, BIPM, EURAMET vb...">
+            </div>
+          </div>
+          <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--text3)">
+            ⚠️ Mevcut kalibrasyon bilgileri ve dosyalar <b style="color:var(--text2)">geçmişe</b> taşınacak, cihaz dosya alanları sıfırlanacaktır.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="closeModal('yenikal-modal')">İptal</button>
+          <button class="btn btn-primary" onclick="saveYeniKal()" style="padding:10px 24px">🔄 Kaydet & Geçmişe Al</button>
+        </div>
+      </div>
+    </div>`;
+    document.body.appendChild(div);
+  }
+  // Cihaz bilgisi göster
+  document.getElementById('yenikal-cihaz-info').innerHTML=
+    `<b>${x.cihazAdi||'-'}</b> · ${x.marka||''} ${x.model||''}<br>
+     <span style="color:var(--text3);font-size:11px">Mevcut Kal. No: ${x.kalibrasyonNo||'-'} · Son Kal: ${formatDate(x.kalibrasyonTarihi)||'-'}</span>`;
+  // Formu temizle
+  document.getElementById('yenikal-no').value='';
+  document.getElementById('yenikal-tarih').value='';
+  document.getElementById('yenikal-sonraki').value='';
+  openModal('yenikal-modal');
+}
+
+function saveYeniKal(){
+  const kalNo=document.getElementById('yenikal-no').value.trim();
+  const kalTar=document.getElementById('yenikal-tarih').value;
+  const sonraki=document.getElementById('yenikal-sonraki').value;
+  if(!kalNo||!kalTar||!sonraki){toast('Tüm alanlar zorunlu','error');return;}
+
+  const items=DB.get('referans')||[];
+  const i=items.findIndex(r=>r.id===_yeniKalRefId); if(i<0) return;
+  const eski={...items[i]};
+
+  // Geçmişe kaydet (eski veriler + dosyalar)
+  const history=DB.get('refHistory')||[];
+  const u=getActiveUser();
+  history.push({
+    id:uid(),
+    ts:new Date().toISOString(),
+    refId:_yeniKalRefId,
+    cihazAdi:eski.cihazAdi,
+    marka:eski.marka,
+    model:eski.model,
+    seriNo:eski.seriNo,
+    envanterNo:eski.envanterNo,
+    kalibrasyonNo:eski.kalibrasyonNo,
+    kalibrasyonTarihi:eski.kalibrasyonTarihi,
+    birSonrakiKalibrasyon:eski.birSonrakiKalibrasyon,
+    pdfFile:eski.pdfFile||null,
+    officeFile:eski.officeFile||null,
+    yapan:u?`${u.ad} ${u.soyad}`:'Sistem'
+  });
+  DB.set('refHistory',history);
+
+  // Cihazı güncelle - dosyaları temizle
+  items[i].kalibrasyonNo=kalNo;
+  items[i].kalibrasyonTarihi=kalTar;
+  items[i].birSonrakiKalibrasyon=sonraki;
+  items[i].izlenebilirlik=document.getElementById('yenikal-izlenebilirlik')?.value||eski.izlenebilirlik||'';
+  items[i].pdfFile=null;
+  items[i].officeFile=null;
+  DB.set('referans',items);
+
+  logActivity('update','referans',{desc:`Yeni kalibrasyon eklendi: ${eski.cihazAdi} → ${kalNo}`});
+  closeModal('yenikal-modal');
+  renderRef();
+  toast('Kalibrasyon güncellendi, eski veriler geçmişe kaydedildi ✅','success');
+}
+
 function uploadRefFile(id, fileType){
   const inp=document.createElement('input');
   inp.type='file';
@@ -2524,6 +2689,7 @@ function addRefModal(){
         <div class="form-group"><label>Sonraki Kalibrasyon Tarihi</label><input id="r-sonraki" type="date"></div>
       </div>
       <div class="form-row">
+        <div class="form-group"><label>İzlenebilirlik</label><input id="r-izlenebilirlik" type="text" placeholder="TÜBİTAK UME, BIPM vb..."></div>
         <div class="form-group"><label>Değerlendirme Kriteri</label><input id="r-kriter" type="text"></div>
         <div class="form-group"><label>Durum (Manuel)</label><select id="r-durum"><option value="">Otomatik</option><option>Güncel</option><option>Kalibrasyon Yaklaştı</option><option>Geçti</option></select></div>
       </div>
@@ -2549,7 +2715,8 @@ function openRefModal(id){
     document.getElementById('r-kalno').value=x.kalibrasyonNo||'';
     document.getElementById('r-tarih').value=x.kalibrasyonTarihi||'';
     document.getElementById('r-sonraki').value=x.birSonrakiKalibrasyon||'';
-    document.getElementById('r-kriter').value=x.degerlendirmeKriteri||'';
+    document.getElementById('r-izlenebilirlik').value=x.izlenebilirlik||'';
+  document.getElementById('r-kriter').value=x.degerlendirmeKriteri||'';
     document.getElementById('r-durum').value=x.manualDurum?x.durum:'';
   } else {
     ['r-cihaz','r-marka','r-model','r-seri','r-envanter','r-kalno','r-kriter'].forEach(i=>document.getElementById(i).value='');
@@ -2687,7 +2854,7 @@ function saveRef(){
   if(!cihaz){toast('Cihaz adı zorunlu','error');return;}
   const items=DB.get('referans')||[];
   const md=document.getElementById('r-durum').value;
-  const data={kategori,cihazAdi:cihaz,marka:document.getElementById('r-marka').value,model:document.getElementById('r-model').value,seriNo:document.getElementById('r-seri').value,envanterNo:document.getElementById('r-envanter').value,kalibrasyonNo:document.getElementById('r-kalno').value,kalibrasyonTarihi:document.getElementById('r-tarih').value,birSonrakiKalibrasyon:document.getElementById('r-sonraki').value,degerlendirmeKriteri:document.getElementById('r-kriter').value,durum:md||'Güncel',manualDurum:!!md};
+  const data={kategori,cihazAdi:cihaz,marka:document.getElementById('r-marka').value,model:document.getElementById('r-model').value,seriNo:document.getElementById('r-seri').value,envanterNo:document.getElementById('r-envanter').value,kalibrasyonNo:document.getElementById('r-kalno').value,kalibrasyonTarihi:document.getElementById('r-tarih').value,birSonrakiKalibrasyon:document.getElementById('r-sonraki').value,izlenebilirlik:document.getElementById('r-izlenebilirlik')?.value||'',degerlendirmeKriteri:document.getElementById('r-kriter').value,durum:md||'Güncel',manualDurum:!!md};
   const u2=getActiveUser();
   if(_editRefId){
     const i=items.findIndex(x=>x.id===_editRefId);
@@ -5137,24 +5304,16 @@ function renderReferansGecmisi(){
   if(!canView('referans')){document.getElementById('content').innerHTML='<div class="empty-state"><p>Bu modülü görüntüleme yetkiniz yok.</p></div>';return;}
   const c=document.getElementById('content');
   c.innerHTML=`<div class="page">
-    <div class="section-header"><div class="section-title">Referans Cihazlar Geçmişi</div></div>
+    <div class="section-header"><div class="section-title">Referans Kalibrasyon Geçmişi</div></div>
     <div class="toolbar">
       <div class="tb-search"><svg class="s-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="rh-search" type="text" placeholder="Cihaz adı, kullanıcı ara..." oninput="renderRefHistTable()">
+        <input id="rh-search" type="text" placeholder="Cihaz adı, kal. no ara..." oninput="renderRefHistTable()">
       </div>
-      <select class="tb-select" id="rh-action" onchange="renderRefHistTable()">
-        <option value="">Tüm İşlemler</option>
-        <option value="create">Oluşturuldu</option>
-        <option value="update">Güncellendi</option>
-        <option value="status_change">Durum Değişti</option>
-        <option value="delete">Silindi</option>
-        <option value="file_upload">Dosya Yüklendi</option>
-      </select>
       <input class="tb-select" id="rh-d1" type="date" onchange="renderRefHistTable()" style="padding:7px 10px">
       <input class="tb-select" id="rh-d2" type="date" onchange="renderRefHistTable()" style="padding:7px 10px">
     </div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Tarih/Saat</th><th>Kullanıcı</th><th>Cihaz</th><th>İşlem</th><th>Değişiklik</th></tr></thead>
+      <thead><tr><th>Tarih/Saat</th><th>Cihaz</th><th>Marka/Model</th><th>Eski Kal. No</th><th>Kal. Tarihi</th><th>Sonraki Kal.</th><th>Yapan</th><th>Dosyalar</th></tr></thead>
       <tbody id="rh-tbody"></tbody>
     </table></div>
   </div>`;
@@ -5163,28 +5322,59 @@ function renderReferansGecmisi(){
 
 function renderRefHistTable(){
   const tbody=document.getElementById('rh-tbody');if(!tbody)return;
-  let hist=DB.get('referansHistory')||[];
+  let hist=DB.get('refHistory')||[];
   const q=(document.getElementById('rh-search')?.value||'').toLowerCase();
-  const act=document.getElementById('rh-action')?.value||'';
   const d1=document.getElementById('rh-d1')?.value||'';
   const d2=document.getElementById('rh-d2')?.value||'';
-  hist=hist.filter(h=>{
-    if(act&&h.actionType!==act)return false;
-    if(d1&&h.ts<d1)return false;
-    if(d2&&h.ts>d2+'T23:59')return false;
-    if(q&&!JSON.stringify(h).toLowerCase().includes(q))return false;
+  hist=hist.filter(r=>{
+    if(q&&![(r.cihazAdi||''),(r.kalibrasyonNo||'')].some(f=>f.toLowerCase().includes(q)))return false;
+    if(d1&&r.ts<d1)return false;
+    if(d2&&r.ts>d2+'T23:59')return false;
     return true;
   });
-  const actionLabels={create:'Oluşturuldu',update:'Güncellendi',status_change:'Durum Değişti',delete:'Silindi',file_upload:'Dosya Yüklendi'};
-  const actionColors={create:'badge-green',update:'badge-blue',status_change:'badge-amber',delete:'badge-red',file_upload:'badge-teal'};
-  if(!hist.length){tbody.innerHTML=`<tr><td colspan="5"><div class="empty-state"><p>Geçmiş bulunamadı</p></div></td></tr>`;return;}
-  tbody.innerHTML=hist.map(h=>`<tr>
-    <td>${new Date(h.ts).toLocaleString('tr-TR')}</td>
-    <td class="strong">${h.user||'-'}</td>
-    <td>${h.snapshot?.cihazAdi||h.cihazAdi||'-'}</td>
-    <td><span class="badge ${actionColors[h.actionType]||'badge-gray'}">${actionLabels[h.actionType]||h.actionType}</span></td>
-    <td style="font-size:12px;color:var(--text3)">${h.changes?`${h.changes.old||''} → ${h.changes.new||''}`:h.actionType==='create'?'Yeni cihaz eklendi':'-'}</td>
+  hist.sort((a,b)=>b.ts.localeCompare(a.ts));
+  if(!hist.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><p>Geçmiş bulunamadı</p></div></td></tr>`;return;}
+  tbody.innerHTML=hist.map(r=>`<tr>
+    <td style="white-space:nowrap">${new Date(r.ts).toLocaleString('tr-TR')}</td>
+    <td class="strong">${r.cihazAdi||'-'}</td>
+    <td style="color:var(--text3)">${[r.marka,r.model].filter(Boolean).join(' ')||'-'}</td>
+    <td><span class="badge badge-gray">${r.kalibrasyonNo||'-'}</span></td>
+    <td>${formatDate(r.kalibrasyonTarihi)||'-'}</td>
+    <td>${formatDate(r.birSonrakiKalibrasyon)||'-'}</td>
+    <td>${r.yapan||'-'}</td>
+    <td><div class="action-btns">
+      ${r.pdfFile?`<button class="icon-btn" title="PDF Görüntüle" onclick="refHistGoruntule('${r.id}','pdf')" style="color:var(--danger)">${icon('eye',13)}</button>`:''}
+      ${r.pdfFile?`<button class="icon-btn" title="PDF İndir" onclick="refHistIndir('${r.id}','pdf')" style="color:var(--danger)">${icon('download',13)}</button>`:''}
+      ${r.officeFile?`<button class="icon-btn" title="${r.officeFile.name} Görüntüle" onclick="refHistGoruntule('${r.id}','office')" style="color:var(--primary)">${icon('eye',13)}</button>`:''}
+      ${r.officeFile?`<button class="icon-btn" title="${r.officeFile.name} İndir" onclick="refHistIndir('${r.id}','office')" style="color:var(--primary)">${icon('download',13)}</button>`:''}
+      ${!r.pdfFile&&!r.officeFile?'<span style="color:var(--text3);font-size:11px">-</span>':''}
+    </div></td>
   </tr>`).join('');
+}
+
+function refHistGoruntule(id, tip){
+  const r=(DB.get('refHistory')||[]).find(x=>x.id===id); if(!r) return;
+  const d=tip==='pdf'?r.pdfFile:r.officeFile; if(!d){toast('Dosya yok','error');return;}
+  if(d.name.toLowerCase().endsWith('.pdf')){
+    const w=window.open('');
+    w.document.write(`<!DOCTYPE html><html><body style="margin:0"><iframe src="${d.data}" style="width:100%;height:100vh;border:none"></iframe></body></html>`);
+  } else {
+    const w=window.open('','_blank','width=1000,height=700');
+    w.document.write(`<!DOCTYPE html><html><head><title>${d.name}</title>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"><\/script>
+      <style>body{font-family:sans-serif;margin:0;background:#1a1a2e;color:#e0e0e0}.tb{background:#16213e;padding:10px 16px;display:flex;gap:8px;align-items:center;border-bottom:1px solid #333}table{border-collapse:collapse;width:100%;font-size:12px}th{background:#2d3561;color:#fff;padding:6px 10px;border:1px solid #444}td{padding:5px 10px;border:1px solid #333;background:#1e1e2e}.sb{padding:4px 10px;border-radius:4px;border:1px solid #444;background:transparent;color:#ccc;cursor:pointer}.sb.a{background:#4f6bf0;color:#fff}</style>
+    </head><body>
+    <div class="tb"><b>📝 ${d.name}</b><div id="st"></div><a href="${d.data}" download="${d.name}" style="margin-left:auto;padding:5px 12px;background:#4f6bf0;color:#fff;border-radius:6px;text-decoration:none;font-size:12px">⬇ İndir</a></div>
+    <div id="tc" style="padding:12px;overflow:auto">Yükleniyor...</div>
+    <script>const b64='${d.data.split(',')[1]||d.data}';const bin=atob(b64);const arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);const wb=XLSX.read(arr,{type:'array'});function show(n){document.querySelectorAll('.sb').forEach(b=>b.classList.toggle('a',b.dataset.n===n));document.getElementById('tc').innerHTML=XLSX.utils.sheet_to_html(wb.Sheets[n]);}wb.SheetNames.forEach(n=>{const b=document.createElement('button');b.className='sb';b.dataset.n=n;b.textContent=n;b.onclick=()=>show(n);document.getElementById('st').appendChild(b);});if(wb.SheetNames.length)show(wb.SheetNames[0]);<\/script>
+    </body></html>`);
+  }
+}
+
+function refHistIndir(id, tip){
+  const r=(DB.get('refHistory')||[]).find(x=>x.id===id); if(!r) return;
+  const d=tip==='pdf'?r.pdfFile:r.officeFile; if(!d) return;
+  const a=document.createElement('a'); a.href=d.data; a.download=d.name; a.click();
 }
 
 // ==================== UYGUNSUZLUKLAR ====================
@@ -5211,6 +5401,10 @@ function renderUygunsuzluklar(){
         <option value="kapatma">Kapatma Tarihi</option>
         <option value="no">Uygunsuzluk No</option>
       </select>
+      <select class="tb-select" id="uyg-yil" onchange="renderUygCards()" style="max-width:100px">
+        <option value="">Tüm Yıllar</option>
+        ${Array.from({length:5},(_,i)=>new Date().getFullYear()-i).map(y=>`<option value="${y}">${y}</option>`).join('')}
+      </select>
     </div>
     <div id="uyg-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px;margin-top:8px"></div>
   </div>`;
@@ -5226,7 +5420,9 @@ function renderUygCards(){
   const q=(document.getElementById('uyg-search')?.value||'').toLowerCase();
   const durum=document.getElementById('uyg-durum')?.value||'';
   const sort=document.getElementById('uyg-sort')?.value||'tarih';
+  const uygYil=document.getElementById('uyg-yil')?.value||'';
   items=items.filter(x=>{
+    if(uygYil&&!(x.tarih||'').startsWith(uygYil))return false;
     if(q&&!(x.no?.toLowerCase().includes(q)||x.aciklama?.toLowerCase().includes(q)))return false;
     if(durum&&x.durum!==durum)return false;
     return true;
