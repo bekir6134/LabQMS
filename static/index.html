@@ -507,11 +507,58 @@ DB.def('refCihazDeg',[]);
 DB.def('kategoriler',['Boyut','Basınç','Kuvvet','Tork','Sıcaklık','Elektrik','Frekans','Yüksek Gerilim','Lüks','Diğer']);
 
 // ==================== RBAC ====================
-const MODULES = ['dokumanlar','disKaynak','lak','pak','araKontrol','referans','satinalma','uygunsuzluklar','personeller','ayarlar'];
+const MODULES = [
+  'dokumanlar',
+  'disKaynak',
+  'lak',
+  'pak',
+  'araKontrol',
+  'referans',
+  'satinalma',
+  'uygunsuzluklar',
+  'personeller',
+  'ayarlar'
+];
+
 const DEFAULT_PERMS = {
-  Yonetici:{dokumanlar:{v:1,e:1},disKaynak:{v:1,e:1},lak:{v:1,e:1},pak:{v:1,e:1},araKontrol:{v:1,e:1},referans:{v:1,e:1},uygunsuzluklar:{v:1,e:1},personeller:{v:1,e:1},satinalma:{v:1,e:1},ayarlar:{v:1,e:1}},
-  Duzenleyebilir:{dokumanlar:{v:1,e:1},disKaynak:{v:1,e:1},lak:{v:1,e:1},pak:{v:1,e:1},araKontrol:{v:1,e:1},referans:{v:1,e:1},uygunsuzluklar:{v:1,e:1},personeller:{v:1,e:0},satinalma:{v:1,e:1},ayarlar:{v:1,e:0}},
-  Goruntuleyebilir:{dokumanlar:{v:1,e:0,satinalma:{v:1,e:0}},disKaynak:{v:1,e:0},lak:{v:1,e:0},pak:{v:1,e:0},araKontrol:{v:1,e:0},referans:{v:1,e:0},uygunsuzluklar:{v:1,e:0},personeller:{v:1,e:0},ayarlar:{v:0,e:0}}
+  Yonetici:{
+    dokumanlar:{v:1,e:1},
+    disKaynak:{v:1,e:1},
+    lak:{v:1,e:1},
+    pak:{v:1,e:1},
+    araKontrol:{v:1,e:1},
+    referans:{v:1,e:1},
+    uygunsuzluklar:{v:1,e:1},
+    personeller:{v:1,e:1},
+    satinalma:{v:1,e:1},
+    ayarlar:{v:1,e:1}
+  },
+
+  Duzenleyebilir:{
+    dokumanlar:{v:1,e:1},
+    disKaynak:{v:1,e:1},
+    lak:{v:1,e:1},
+    pak:{v:1,e:1},
+    araKontrol:{v:1,e:1},
+    referans:{v:1,e:1},
+    uygunsuzluklar:{v:1,e:1},
+    personeller:{v:1,e:0},
+    satinalma:{v:1,e:1},
+    ayarlar:{v:1,e:0}
+  },
+
+  Goruntuleyebilir:{
+    dokumanlar:{v:1,e:0},
+    disKaynak:{v:1,e:0},
+    lak:{v:1,e:0},
+    pak:{v:1,e:0},
+    araKontrol:{v:1,e:0},
+    referans:{v:1,e:0},
+    uygunsuzluklar:{v:1,e:0},
+    personeller:{v:1,e:0},
+    satinalma:{v:1,e:0},
+    ayarlar:{v:0,e:0}
+  }
 };
 
 function getActiveUser(){
