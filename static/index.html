@@ -6522,16 +6522,18 @@ async function init() {
   const msg = document.getElementById('app-loading-msg');
   const login = document.getElementById('login-screen');
 
-  if (msg) msg.textContent = 'Uygulama hazırlanıyor...';
+  if (loading) loading.style.display = 'flex';
+  if (msg) msg.textContent = 'Veritabanına bağlanıyor...';
+
+  await DB.loadAll();
+
+  if (msg) msg.textContent = 'Varsayılan veriler yükleniyor...';
+  await DB.flushDefaults();
 
   applySettings();
 
   if (loading) loading.style.display = 'none';
   if (login) login.style.display = 'flex';
-
-  DB.loadAll()
-    .then(() => DB.flushDefaults())
-    .catch(err => console.error('Arka plan veri yükleme hatası:', err));
 }
 
   // Session kontrolü - daha önce giriş yapıldı mı?
