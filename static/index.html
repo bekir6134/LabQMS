@@ -507,58 +507,11 @@ DB.def('refCihazDeg',[]);
 DB.def('kategoriler',['Boyut','Basınç','Kuvvet','Tork','Sıcaklık','Elektrik','Frekans','Yüksek Gerilim','Lüks','Diğer']);
 
 // ==================== RBAC ====================
-const MODULES = [
-  'dokumanlar',
-  'disKaynak',
-  'lak',
-  'pak',
-  'araKontrol',
-  'referans',
-  'satinalma',
-  'uygunsuzluklar',
-  'personeller',
-  'ayarlar'
-];
-
+const MODULES = ['dokumanlar','disKaynak','lak','pak','araKontrol','referans','satinalma','uygunsuzluklar','personeller','ayarlar'];
 const DEFAULT_PERMS = {
-  Yonetici:{
-    dokumanlar:{v:1,e:1},
-    disKaynak:{v:1,e:1},
-    lak:{v:1,e:1},
-    pak:{v:1,e:1},
-    araKontrol:{v:1,e:1},
-    referans:{v:1,e:1},
-    uygunsuzluklar:{v:1,e:1},
-    personeller:{v:1,e:1},
-    satinalma:{v:1,e:1},
-    ayarlar:{v:1,e:1}
-  },
-
-  Duzenleyebilir:{
-    dokumanlar:{v:1,e:1},
-    disKaynak:{v:1,e:1},
-    lak:{v:1,e:1},
-    pak:{v:1,e:1},
-    araKontrol:{v:1,e:1},
-    referans:{v:1,e:1},
-    uygunsuzluklar:{v:1,e:1},
-    personeller:{v:1,e:0},
-    satinalma:{v:1,e:1},
-    ayarlar:{v:1,e:0}
-  },
-
-  Goruntuleyebilir:{
-    dokumanlar:{v:1,e:0},
-    disKaynak:{v:1,e:0},
-    lak:{v:1,e:0},
-    pak:{v:1,e:0},
-    araKontrol:{v:1,e:0},
-    referans:{v:1,e:0},
-    uygunsuzluklar:{v:1,e:0},
-    personeller:{v:1,e:0},
-    satinalma:{v:1,e:0},
-    ayarlar:{v:0,e:0}
-  }
+  Yonetici:{dokumanlar:{v:1,e:1},disKaynak:{v:1,e:1},lak:{v:1,e:1},pak:{v:1,e:1},araKontrol:{v:1,e:1},referans:{v:1,e:1},uygunsuzluklar:{v:1,e:1},personeller:{v:1,e:1},satinalma:{v:1,e:1},ayarlar:{v:1,e:1}},
+  Duzenleyebilir:{dokumanlar:{v:1,e:1},disKaynak:{v:1,e:1},lak:{v:1,e:1},pak:{v:1,e:1},araKontrol:{v:1,e:1},referans:{v:1,e:1},uygunsuzluklar:{v:1,e:1},personeller:{v:1,e:0},satinalma:{v:1,e:1},ayarlar:{v:1,e:0}},
+  Goruntuleyebilir:{dokumanlar:{v:1,e:0,satinalma:{v:1,e:0}},disKaynak:{v:1,e:0},lak:{v:1,e:0},pak:{v:1,e:0},araKontrol:{v:1,e:0},referans:{v:1,e:0},uygunsuzluklar:{v:1,e:0},personeller:{v:1,e:0},ayarlar:{v:0,e:0}}
 };
 
 function getActiveUser(){
@@ -585,7 +538,7 @@ const NAV_ITEMS = [
     {id:'dis-kaynak-gecmisi',label:'Dış Kaynak Geçmişi',icon:'clock',page:'dis-kaynak-gecmisi',mod:'disKaynak'}
   ]},
     {id:'lak',label:'Lak/Yt',icon:'activity',page:'lak-listesi',mod:'lak'},
-  {id:'pak',label:'Pak',icon:'users',page:'pak-listesi',mod:'pak'},
+  {id:'pak',label:'Pak',icon:'users',page:'pak-listesi',mod:'pak'},,
   {id:'ara-kontrol',label:'Ara Kontrol',icon:'shield-check',page:'ara-kontrol',mod:'araKontrol'},
   {id:'referans',label:'Referans Cihazlar',icon:'cpu',mod:'referans',children:[
     {id:'referans-listesi',label:'Referans Listesi',icon:'layers',page:'referans',mod:'referans'},
@@ -6517,24 +6470,22 @@ function doLogout(){
   showLogin();
 }
 
-async function init() {
+async function init(){
+  // Önce API'den tüm veriyi yükle, sonra uygulamayı başlat
   const loading = document.getElementById('app-loading');
+  if(loading) loading.style.display='flex';
+
   const msg = document.getElementById('app-loading-msg');
-  const login = document.getElementById('login-screen');
-
-  if (loading) loading.style.display = 'flex';
-  if (msg) msg.textContent = 'Veritabanına bağlanıyor...';
-
+  if(msg) msg.textContent = 'Veritabanına bağlanıyor...';
   await DB.loadAll();
+  if(msg) msg.textContent = 'Varsayılan veriler yükleniyor...';
 
-  if (msg) msg.textContent = 'Varsayılan veriler yükleniyor...';
   await DB.flushDefaults();
+  if(msg) msg.textContent = 'Uygulama hazırlanıyor...';
+
+  if(loading) loading.style.display='none';
 
   applySettings();
-
-  if (loading) loading.style.display = 'none';
-  if (login) login.style.display = 'flex';
-}
 
   // Session kontrolü - daha önce giriş yapıldı mı?
   const sessionUserId = sessionStorage.getItem('qms_session');
@@ -6561,6 +6512,7 @@ async function init() {
   if(window.innerWidth<=768){
     document.getElementById('menu-toggle').style.display='flex';
   }
+}
 
 // Close sidebar on nav click (mobile)
 document.getElementById('nav-menu').addEventListener('click',()=>{
