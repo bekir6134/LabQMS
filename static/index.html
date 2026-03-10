@@ -6472,20 +6472,26 @@ function doLogout(){
 
 async function init(){
   // Önce API'den tüm veriyi yükle, sonra uygulamayı başlat
+ 
   const loading = document.getElementById('app-loading');
-  if(loading) loading.style.display='flex';
+  if (loading) loading.style.display = 'flex';
 
   const msg = document.getElementById('app-loading-msg');
-  if(msg) msg.textContent = 'Veritabanına bağlanıyor...';
-  await DB.loadAll();
-  if(msg) msg.textContent = 'Varsayılan veriler yükleniyor...';
+
+  if (msg) msg.textContent = 'Veritabanına bağlanıyor...';
+
+  await DB.loadAll();   // burada bekle
+
+  if (msg) msg.textContent = 'Varsayılan veriler yükleniyor...';
 
   await DB.flushDefaults();
-  if(msg) msg.textContent = 'Uygulama hazırlanıyor...';
 
-  if(loading) loading.style.display='none';
+  if (msg) msg.textContent = 'Uygulama hazırlanıyor...';
+
+  if (loading) loading.style.display = 'none';
 
   applySettings();
+}
 
   // Session kontrolü - daha önce giriş yapıldı mı?
   const sessionUserId = sessionStorage.getItem('qms_session');
