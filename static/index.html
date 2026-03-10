@@ -538,7 +538,7 @@ const NAV_ITEMS = [
     {id:'dis-kaynak-gecmisi',label:'Dış Kaynak Geçmişi',icon:'clock',page:'dis-kaynak-gecmisi',mod:'disKaynak'}
   ]},
     {id:'lak',label:'Lak/Yt',icon:'activity',page:'lak-listesi',mod:'lak'},
-  {id:'pak',label:'Pak',icon:'users',page:'pak-listesi',mod:'pak'},,
+  {id:'pak',label:'Pak',icon:'users',page:'pak-listesi',mod:'pak'},
   {id:'ara-kontrol',label:'Ara Kontrol',icon:'shield-check',page:'ara-kontrol',mod:'araKontrol'},
   {id:'referans',label:'Referans Cihazlar',icon:'cpu',mod:'referans',children:[
     {id:'referans-listesi',label:'Referans Listesi',icon:'layers',page:'referans',mod:'referans'},
@@ -6470,27 +6470,21 @@ function doLogout(){
   showLogin();
 }
 
-async function init(){
-  // Önce API'den tüm veriyi yükle, sonra uygulamayı başlat
- 
+async function init() {
   const loading = document.getElementById('app-loading');
-  if (loading) loading.style.display = 'flex';
-
   const msg = document.getElementById('app-loading-msg');
-
-  if (msg) msg.textContent = 'Veritabanına bağlanıyor...';
-
-  await DB.loadAll();   // burada bekle
-
-  if (msg) msg.textContent = 'Varsayılan veriler yükleniyor...';
-
-  await DB.flushDefaults();
+  const login = document.getElementById('login-screen');
 
   if (msg) msg.textContent = 'Uygulama hazırlanıyor...';
 
-  if (loading) loading.style.display = 'none';
-
   applySettings();
+
+  if (loading) loading.style.display = 'none';
+  if (login) login.style.display = 'flex';
+
+  DB.loadAll()
+    .then(() => DB.flushDefaults())
+    .catch(err => console.error('Arka plan veri yükleme hatası:', err));
 }
 
   // Session kontrolü - daha önce giriş yapıldı mı?
